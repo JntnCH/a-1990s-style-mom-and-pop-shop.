@@ -88,7 +88,6 @@ import {
   formatDailyOrderFlexMessage,
   formatOrderPlainText,
   getLineStatus,
-  sendDailyOrderToLine,
   sendStockAlertToLine,
   type LineConfigStatus,
   type OrderFlexItem,
@@ -477,7 +476,7 @@ function ReorderPage() {
 
   // Phase 6 Action: Save Purchase Order Record
   const handleSavePO = (status: "DRAFT" | "ORDERED") => {
-    if (fullItems.length === 0) return;
+    if (fullItems.length === 0) return undefined;
 
     const poRecord = MasterStore.savePurchaseOrder({
       supplierName: supplierNameInput.trim() || undefined,
@@ -507,6 +506,7 @@ function ReorderPage() {
       }) เรียบร้อยแล้ว`,
     });
     setActiveTab("po_history");
+    return poRecord;
   };
 
   // Phase 6 Action: Receive Purchase Order into Stock
@@ -592,25 +592,44 @@ function ReorderPage() {
         day: "numeric",
       });
 
-      const res = await sendDailyOrderToLine(fullItems, target, orderDateStr);
+      const savedPO = handleSavePO("DRAFT");
+      if (!savedPO) return;
+      const flexMsg = createPurchaseOrderFlexBubble(
+        fullItems.map((item) => ({
+          name: item.name,
+          quantity: item.quantity,
+          unitName: item.unitName,
+          costPrice: item.product.costPrice,
+          barcode: item.barcode,
+        })),
+        {
+          storeName: "ร้าน MiniMark",
+          orderNumber: savedPO.orderNumber,
+          note: `ใบสั่งซื้อ #${savedPO.orderNumber}`,
+          dateStr: orderDateStr,
+        },
+      );
+      const res = await sendLineMessagingApiFn({
+        data: {
+          orderSummary: `ใบสั่งซื้อ ${savedPO.orderNumber} (${target === "group" ? "แจ้งร้านค้า" : "แจ้งผู้รับที่ตั้งค่า"})`,
+          flexMessage: flexMsg,
+        },
+      });
 
       if (res.success) {
-        // Automatically save as ORDERED Purchase Order
-        handleSavePO("ORDERED");
+        MasterStore.updatePurchaseOrderStatus(savedPO.id, "ORDERED", {
+          sentViaLineAt: new Date().toLocaleDateString("th-TH") + " " + new Date().toLocaleTimeString("th-TH"),
+        });
+        reloadData();
 
         setStatusMessage({
           type: "success",
-          text:
-            res.method === "share_target_picker"
-              ? `เปิด LINE Share เรียบร้อย กรุณาเลือก${
-                  target === "group" ? "กลุ่มที่ต้องการส่ง" : "เพื่อน/แชทที่ต้องการส่ง"
-                }`
-              : "เปิดหน้าแชร์ LINE พร้อมบันทึกใบสั่งซื้อสถานะ 'สั่งซื้อแล้ว' เรียบร้อย",
+          text: `ส่งใบสั่งซื้อ ${savedPO.orderNumber} เป็น Flex Message ผ่าน LINE Messaging API สำเร็จ และบันทึกสถานะเรียบร้อย`,
         });
       } else {
         setStatusMessage({
           type: "error",
-          text: res.error || "เกิดข้อผิดพลาดในการส่งข้อความ LINE",
+          text: res.error || "ส่ง Flex Message ไม่สำเร็จ (ใบสั่งซื้อถูกเก็บเป็นฉบับร่าง)",
         });
       }
     } catch (err: unknown) {
