@@ -47,14 +47,16 @@ jobs:
           LINE_TO_ID: "${{ secrets.LINE_TO_ID || vars.LINE_TO_ID }}"
         run: |
           set -euo pipefail
-          missing=()
-          if [ -z "$LINE_CHANNEL_ACCESS_TOKEN" ]; then missing+=("LINE_CHANNEL_ACCESS_TOKEN"); fi
-          if [ -z "$LINE_TO_ID" ]; then missing+=("LINE_TO_ID"); fi
-          if [ "${#missing[@]}" -gt 0 ]; then
-            echo "::error::Missing required GitHub Actions secret(s): ${missing[*]}"
+          if [ -z "$LINE_CHANNEL_ACCESS_TOKEN" ]; then
+            echo "::error::Missing required GitHub Actions secret: LINE_CHANNEL_ACCESS_TOKEN"
             exit 1
           fi
-          echo "LINE runtime secrets are configured (values are not printed)."
+          if [ -z "$LINE_TO_ID" ]; then
+            echo "::warning::LINE_TO_ID is not configured; LIFF Target Picker remains available, but server Flex fallback needs a recipient ID."
+          else
+            echo "LINE server fallback recipient is configured (value is not printed)."
+          fi
+          echo "LINE_CHANNEL_ACCESS_TOKEN is configured (value is not printed)."
 
       # Authenticate to Google Cloud (Workload Identity Federation or Service Account Key)
       - id: "auth"

@@ -88,6 +88,7 @@ import {
   formatDailyOrderFlexMessage,
   formatOrderPlainText,
   getLineStatus,
+  sendDailyOrderToLine,
   sendStockAlertToLine,
   type LineConfigStatus,
   type OrderFlexItem,
@@ -594,37 +595,21 @@ function ReorderPage() {
 
       const savedPO = handleSavePO("DRAFT");
       if (!savedPO) return;
-      const flexMsg = createPurchaseOrderFlexBubble(
-        fullItems.map((item) => ({
-          name: item.name,
-          quantity: item.quantity,
-          unitName: item.unitName,
-          costPrice: item.product.costPrice,
-          barcode: item.barcode,
-        })),
-        {
-          storeName: "ร้าน MiniMark",
-          orderNumber: savedPO.orderNumber,
-          note: `ใบสั่งซื้อ #${savedPO.orderNumber}`,
-          dateStr: orderDateStr,
-        },
-      );
-      const res = await sendLineMessagingApiFn({
-        data: {
-          orderSummary: `ใบสั่งซื้อ ${savedPO.orderNumber} (${target === "group" ? "แจ้งร้านค้า" : "แจ้งผู้รับที่ตั้งค่า"})`,
-          flexMessage: flexMsg,
-        },
-      });
+      const res = await sendDailyOrderToLine(fullItems, target, orderDateStr);
 
       if (res.success) {
         MasterStore.updatePurchaseOrderStatus(savedPO.id, "ORDERED", {
-          sentViaLineAt: new Date().toLocaleDateString("th-TH") + " " + new Date().toLocaleTimeString("th-TH"),
+          sentViaLineAt:
+            new Date().toLocaleDateString("th-TH") + " " + new Date().toLocaleTimeString("th-TH"),
         });
         reloadData();
 
         setStatusMessage({
           type: "success",
-          text: `ส่งใบสั่งซื้อ ${savedPO.orderNumber} เป็น Flex Message ผ่าน LINE Messaging API สำเร็จ และบันทึกสถานะเรียบร้อย`,
+          text:
+            res.method === "server_flex"
+              ? `ส่งใบสั่งซื้อ ${savedPO.orderNumber} เป็น Flex Message ผ่าน LINE Messaging API สำเร็จ และบันทึกสถานะเรียบร้อย`
+              : `เปิด LINE เพื่อเลือก${target === "group" ? "กลุ่ม" : "เพื่อน"}และส่ง Flex Message ของใบสั่งซื้อ ${savedPO.orderNumber} เรียบร้อย`,
         });
       } else {
         setStatusMessage({

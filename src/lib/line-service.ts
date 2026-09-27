@@ -11,6 +11,7 @@ import {
   createStockAlertFlexBubble,
   type FlexStockAlertItem,
 } from "./flex-templates";
+import { sendLineMessagingApiFn } from "./line-server-fn";
 
 export interface LineOrderItem {
   product: ProductItem;
@@ -179,13 +180,13 @@ export type LineShareTarget = "group" | "personal";
 
 export interface LineShareResult {
   success: boolean;
-  channel: "liff_picker" | "liff_send" | "line_intent";
+  channel: "liff_picker" | "liff_send" | "server_flex";
   message: string;
 }
 
 /**
- * Dispatches the order to LINE either via LIFF Target Picker (Group / Personal)
- * or via standard LINE Share Intent when running outside LIFF.
+ * Dispatches the order to LINE via the original LIFF Target Picker flow.
+ * If LIFF is unavailable, falls back to the server-side Flex push endpoint.
  */
 export async function sendOrderToLine(
   orders: LineOrderItem[],
@@ -197,7 +198,6 @@ export async function sendOrderToLine(
     `ใบสั่งซื้อประจำวัน (${target === "group" ? "กลุ่ม" : "ส่วนตัว"})`,
     storeName,
   );
-  const plain = buildOrderPlainText(orders, storeName);
 
   const liffId = getClientLiffId();
 
@@ -242,24 +242,34 @@ export async function sendOrderToLine(
     }
   }
 
-  // Fallback: Open LINE Share Intent URL (works on all web browsers & mobile)
-  const lineIntentUrl = `https://line.me/R/share?text=${encodeURIComponent(plain)}`;
-  if (typeof window !== "undefined") {
-    // In iframe or web environment, open share intent
-    const link = document.createElement("a");
-    link.href = lineIntentUrl;
-    link.target = "_blank";
-    link.rel = "noopener noreferrer";
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+  // Fallback: keep the message as Flex and send via LINE Messaging API.
+  // The server resolves LINE_TO_ID; no plain-text share URL is used.
+  try {
+    const res = await sendLineMessagingApiFn({
+      data: {
+        orderSummary: `ใบสั่งซื้อประจำวัน (${target === "group" ? "กลุ่ม" : "ส่วนตัว"})`,
+        flexMessage: flex,
+      },
+    });
+    if (res.success) {
+      return {
+        success: true,
+        channel: "server_flex",
+        message: "ส่ง Flex Message ผ่าน LINE Messaging API สำเร็จ",
+      };
+    }
+    return {
+      success: false,
+      channel: "server_flex",
+      message: res.error || "ไม่สามารถส่ง Flex Message ผ่าน LINE Messaging API ได้",
+    };
+  } catch (err: unknown) {
+    return {
+      success: false,
+      channel: "server_flex",
+      message: `ส่ง Flex Message ไม่สำเร็จ: ${String(err)}`,
+    };
   }
-
-  return {
-    success: true,
-    channel: "line_intent",
-    message: `เปิดหน้าแชร์ LINE สำหรับส่งเข้า${target === "group" ? "กลุ่ม" : "ส่วนตัว"}เรียบร้อย`,
-  };
 }
 
 export interface OrderFlexItem {
@@ -347,7 +357,12 @@ export async function sendDailyOrderToLine(
   const res = await sendOrderToLine(lineOrders, target);
   const result: { success: boolean; method?: string; error?: string } = {
     success: res.success,
-    method: res.channel === "liff_picker" ? "share_target_picker" : "web_intent",
+    method:
+      res.channel === "liff_picker"
+        ? "share_target_picker"
+        : res.channel === "liff_send"
+          ? "liff_send"
+          : "server_flex",
   };
   if (!res.success && res.message) {
     result.error = res.message;
