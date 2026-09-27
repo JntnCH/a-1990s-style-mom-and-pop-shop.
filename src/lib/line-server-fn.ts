@@ -4,6 +4,7 @@ export interface SendLineOrderPayload {
   toUserIdOrGroupId?: string | undefined;
   orderSummary: string;
   flexMessage?: unknown;
+  /** @deprecated Kept for legacy callers; server intentionally ignores client tokens. */
   channelAccessToken?: string | undefined;
   isBroadcast?: boolean;
 }
@@ -176,23 +177,28 @@ export const registerLineFollowerFn = createServerFn({ method: "POST" })
 export const sendLineMessagingApiFn = createServerFn({ method: "POST" })
   .validator((data: SendLineOrderPayload) => data)
   .handler(async ({ data }) => {
-    const token = data.channelAccessToken?.trim() || process.env["LINE_CHANNEL_ACCESS_TOKEN"];
+    const token = process.env["LINE_CHANNEL_ACCESS_TOKEN"]?.trim();
 
     if (!token) {
       return {
         success: false,
         configured: false,
-        error: "กรุณาระบุ Channel Access Token หรือตั้งค่า LINE_CHANNEL_ACCESS_TOKEN บน Server",
+        error: "ยังไม่ได้ตั้งค่า LINE_CHANNEL_ACCESS_TOKEN บน Server",
       };
     }
 
     const isBroadcast = Boolean(data.isBroadcast);
-    const target = data.toUserIdOrGroupId?.trim();
-    if (!isBroadcast && !target) {
+    const configuredTargets = (process.env["LINE_TO_ID"] || "")
+      .split(",")
+      .map((value) => value.trim())
+      .filter(Boolean);
+    const requestedTarget = data.toUserIdOrGroupId?.trim();
+    const targets = requestedTarget ? [requestedTarget] : configuredTargets;
+    if (!isBroadcast && targets.length === 0) {
       return {
         success: false,
         configured: true,
-        error: "ยังไม่ได้ระบุ LINE Group ID หรือ User ID สำหรับส่งผ่าน Messaging API",
+        error: "ยังไม่ได้ตั้งค่า LINE_TO_ID บน Server หรือระบุ LINE recipient ID",
       };
     }
 
@@ -227,27 +233,29 @@ export const sendLineMessagingApiFn = createServerFn({ method: "POST" })
       };
     }
 
-    const endpoint = isBroadcast
-      ? "https://api.line.me/v2/bot/message/broadcast"
-      : "https://api.line.me/v2/bot/message/push";
-
-    const requestBody = isBroadcast
-      ? { messages: [messageObj] }
-      : { to: target, messages: [messageObj] };
-
     try {
-      const res = await fetch(endpoint, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(requestBody),
-      });
+      const endpoint = isBroadcast
+        ? "https://api.line.me/v2/bot/message/broadcast"
+        : "https://api.line.me/v2/bot/message/push";
+      const recipients = isBroadcast ? [undefined] : targets;
 
-      if (!res.ok) {
-        const text = await res.text();
-        return { success: false, configured: true, error: text };
+      for (const recipient of recipients) {
+        const requestBody = isBroadcast
+          ? { messages: [messageObj] }
+          : { to: recipient, messages: [messageObj] };
+        const res = await fetch(endpoint, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify(requestBody),
+        });
+
+        if (!res.ok) {
+          const text = await res.text();
+          return { success: false, configured: true, error: `LINE API ส่งไม่สำเร็จ: ${text}` };
+        }
       }
 
       return { success: true, configured: true };
