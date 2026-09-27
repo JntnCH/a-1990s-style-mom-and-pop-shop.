@@ -44,7 +44,7 @@ jobs:
       - name: "Validate LINE runtime secrets"
         env:
           LINE_CHANNEL_ACCESS_TOKEN: "${{ secrets.LINE_CHANNEL_ACCESS_TOKEN }}"
-          LINE_TO_ID: "${{ secrets.LINE_TO_ID }}"
+          LINE_TO_ID: "${{ secrets.LINE_TO_ID || vars.LINE_TO_ID }}"
         run: |
           set -euo pipefail
           missing=()
@@ -100,7 +100,7 @@ jobs:
           region: "${{ env.REGION }}"
           env_vars: |-
             LINE_CHANNEL_ACCESS_TOKEN: ${{ secrets.LINE_CHANNEL_ACCESS_TOKEN }}
-            LINE_TO_ID: ${{ secrets.LINE_TO_ID }}
+            LINE_TO_ID: ${{ secrets.LINE_TO_ID || vars.LINE_TO_ID }}
           flags: "--allow-unauthenticated --port=8080 --cpu=1 --memory=512Mi --min-instances=0 --max-instances=2"
 
       # Explicitly grant public unauthenticated access (allUsers)
