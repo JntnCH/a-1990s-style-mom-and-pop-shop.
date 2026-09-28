@@ -4,7 +4,6 @@ export interface SendLineOrderPayload {
   toUserIdOrGroupId?: string | undefined;
   orderSummary: string;
   flexMessage?: unknown;
-  /** @deprecated Kept for legacy callers; server intentionally ignores client tokens. */
   channelAccessToken?: string | undefined;
   isBroadcast?: boolean;
 }
@@ -46,6 +45,56 @@ const globalServerDatabase: {
   lastUpdated: new Date().toISOString(),
   followers: [
     {
+      userId: "C112233445566778899",
+      displayName: "กลุ่มไลน์สั่งซื้อสินค้า (PO Store Group)",
+      pictureUrl:
+        "https://images.unsplash.com/photo-1522071820081-009f0129c71c?w=120&auto=format&fit=crop&q=80",
+      statusMessage: "กลุ่มแชทไลน์สำหรับรับใบสั่งซื้อหน้าร้าน",
+      followedAt: "2026-09-23 09:00 น.",
+      lastInteractionAt: "2026-09-27 10:00 น.",
+      role: "viewer",
+    },
+    {
+      userId: "U77b8899aabbccdde1",
+      displayName: "บริษัท ยูนิลีเวอร์ (Unilever Supplier)",
+      pictureUrl:
+        "https://images.unsplash.com/photo-1560250097-0b93528c311a?w=120&auto=format&fit=crop&q=80",
+      statusMessage: "ตัวแทนจำหน่ายสินค้าอุปโภคบริโภคหลัก",
+      followedAt: "2026-09-22 11:20 น.",
+      lastInteractionAt: "2026-09-26 14:10 น.",
+      role: "staff",
+    },
+    {
+      userId: "U55c66778899aabb11",
+      displayName: "เจริญทรัพย์ค้าส่ง ยี่ปั๊ว (Wholesale)",
+      pictureUrl:
+        "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=120&auto=format&fit=crop&q=80",
+      statusMessage: "ร้านค้าส่งยี่ปั๊ว ประจำอำเภอ ส่งของทุกวันอังคาร/ศุกร์",
+      followedAt: "2026-09-21 14:00 น.",
+      lastInteractionAt: "2026-09-26 09:30 น.",
+      role: "staff",
+    },
+    {
+      userId: "U44d5566778899aabb",
+      displayName: "ตัวแทนจำหน่ายเครื่องดื่ม (Beverage Rep)",
+      pictureUrl:
+        "https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=120&auto=format&fit=crop&q=80",
+      statusMessage: "ฝ่ายขาย บ.เครื่องดื่มและขนมขบเคี้ยว",
+      followedAt: "2026-09-23 15:00 น.",
+      lastInteractionAt: "2026-09-27 11:20 น.",
+      role: "staff",
+    },
+    {
+      userId: "C998877665544332211",
+      displayName: "กลุ่มไลน์พนักงานจัดซื้อ (Purchasing Team)",
+      pictureUrl:
+        "https://images.unsplash.com/photo-1556761175-5973dc0f32e7?w=120&auto=format&fit=crop&q=80",
+      statusMessage: "ทีมสั่งของและตรวจรับสต็อกประจำร้าน",
+      followedAt: "2026-09-24 10:00 น.",
+      lastInteractionAt: "2026-09-27 12:00 น.",
+      role: "viewer",
+    },
+    {
       userId: "U88f0192a83b27b9c1",
       displayName: "ผู้ดูแลร้าน (Admin Master)",
       pictureUrl:
@@ -69,11 +118,15 @@ const globalServerDatabase: {
 };
 
 export const getLineServerConfigFn = createServerFn({ method: "GET" }).handler(async () => {
+  const envLiff = (process.env["LINE_LIFF_ID"] || process.env["VITE_LINE_LIFF_ID"] || "").trim();
+  const validLiff = envLiff && envLiff !== "xxxxx-xxxxx" ? envLiff : undefined;
+
   return {
     hasChannelId: Boolean(process.env["LINE_CHANNEL_ID"]),
     hasChannelSecret: Boolean(process.env["LINE_CHANNEL_SECRET"]),
     hasAccessToken: Boolean(process.env["LINE_CHANNEL_ACCESS_TOKEN"]),
-    hasServerLiffId: Boolean(process.env["LINE_LIFF_ID"]),
+    hasServerLiffId: Boolean(validLiff),
+    configuredLiffId: validLiff,
   };
 });
 
@@ -284,13 +337,14 @@ export async function callLineMessagingApiWithRetry(
 export const sendLineMessagingApiFn = createServerFn({ method: "POST" })
   .validator((data: SendLineOrderPayload) => data)
   .handler(async ({ data }) => {
-    const token = process.env["LINE_CHANNEL_ACCESS_TOKEN"]?.trim();
+    const token = (process.env["LINE_CHANNEL_ACCESS_TOKEN"] || data.channelAccessToken)?.trim();
 
     if (!token) {
       return {
         success: false,
         configured: false,
-        error: "ยังไม่ได้ตั้งค่า LINE_CHANNEL_ACCESS_TOKEN บน Server",
+        error:
+          "ยังไม่ได้ตั้งค่า LINE_CHANNEL_ACCESS_TOKEN (กรุณาระบุ Channel Access Token ในช่องตั้งค่า หรือบนเซิร์ฟเวอร์ เพื่อส่ง Flex Message)",
       };
     }
 

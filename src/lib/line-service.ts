@@ -29,21 +29,36 @@ export interface LineConfigStatus {
   error?: string | undefined;
 }
 
-// Strictly retrieve LIFF ID from Vite env without any hardcoded fallback
+// Retrieve LIFF ID from localStorage, Vite env, or runtime config
 export function getClientLiffId(): string | null {
   if (typeof window === "undefined") return null;
-  const id = import.meta.env["VITE_LINE_LIFF_ID"];
-  if (!id || typeof id !== "string" || id.trim() === "") {
-    return null;
+  const local = localStorage.getItem("minimark_line_liff_id");
+  if (local && local.trim() && local.trim() !== "xxxxx-xxxxx") {
+    return local.trim();
   }
-  return id.trim();
+  const id = import.meta.env["VITE_LINE_LIFF_ID"];
+  if (id && typeof id === "string" && id.trim() !== "" && id.trim() !== "xxxxx-xxxxx") {
+    return id.trim();
+  }
+  return null;
+}
+
+export function setClientLiffId(id: string): void {
+  if (typeof window === "undefined") return;
+  if (!id || !id.trim()) {
+    localStorage.removeItem("minimark_line_liff_id");
+  } else {
+    localStorage.setItem("minimark_line_liff_id", id.trim());
+  }
+  liffInstance = null;
+  liffInitPromise = null;
 }
 
 let liffInstance: typeof import("@line/liff").default | null = null;
 let liffInitPromise: Promise<boolean> | null = null;
 
 /**
- * Initializes LINE LIFF SDK safely (Browser-only, no fallback secrets)
+ * Initializes LINE LIFF SDK safely (Browser-only)
  */
 export async function initLiff(): Promise<boolean> {
   if (typeof window === "undefined") return false;
@@ -184,6 +199,8 @@ export interface ThreeTierSendOptions {
   target?: LineShareTarget;
   toUserIdOrGroupId?: string;
   isBroadcast?: boolean;
+  channelAccessToken?: string;
+  disableIntentFallback?: boolean;
 }
 
 export interface LineShareResult {
@@ -192,6 +209,93 @@ export interface LineShareResult {
   tier: 1 | 2 | 3;
   message: string;
   fallbackReason?: string | undefined;
+}
+
+/**
+ * Directly trigger LINE LIFF shareTargetPicker with a Flex Message
+ */
+export async function shareFlexViaLiffPicker(
+  flexMessage: unknown,
+  altSummary: string = "รายการสั่งซื้อสินค้า MiniMark",
+): Promise<{ success: boolean; message: string; needLiffId?: boolean }> {
+  if (typeof window === "undefined") {
+    return { success: false, message: "ทำงานบนเบราว์เซอร์เท่านั้น" };
+  }
+
+  const liffId = getClientLiffId();
+  if (!liffId) {
+    return {
+      success: false,
+      needLiffId: true,
+      message:
+        "ยังไม่ได้ระบุ LINE LIFF ID ในระบบ กรุณาระบุ LIFF ID เพื่อเปิดรายชื่อเพื่อนในแอป LINE",
+    };
+  }
+
+  const initialized = await initLiff();
+  if (!initialized || !liffInstance) {
+    return {
+      success: false,
+      message: `ไม่สามารถเริ่มต้น LINE LIFF SDK ได้ (${liffId}) กรุณาตรวจสอบ LIFF ID`,
+    };
+  }
+
+  if (!liffInstance.isLoggedIn()) {
+    try {
+      liffInstance.login();
+      return { success: false, message: "กำลังเปิดหน้าเข้าสู่ระบบ LINE..." };
+    } catch {
+      return {
+        success: false,
+        message: "กรุณาเปิดหน้านี้ผ่านแอป LINE เพื่อเลือกเพื่อนส่ง Flex Message",
+      };
+    }
+  }
+
+  if (!liffInstance.isApiAvailable("shareTargetPicker")) {
+    return {
+      success: false,
+      message: "LIFF App นี้ยังไม่ได้เปิดฟังก์ชัน Share Target Picker ใน LINE Developers Console",
+    };
+  }
+
+  try {
+    let messagePayload: unknown;
+    if (flexMessage && typeof flexMessage === "object") {
+      const flexObj = flexMessage as Record<string, unknown>;
+      if (flexObj["type"] === "flex") {
+        messagePayload = flexObj;
+      } else if (flexObj["type"] === "bubble" || flexObj["type"] === "carousel") {
+        messagePayload = {
+          type: "flex",
+          altText: altSummary,
+          contents: flexObj,
+        };
+      } else if (flexObj["contents"]) {
+        messagePayload = {
+          type: "flex",
+          altText: (flexObj["altText"] as string) || altSummary,
+          contents: flexObj["contents"],
+        };
+      } else {
+        messagePayload = { type: "flex", altText: altSummary, contents: flexObj };
+      }
+    } else {
+      messagePayload = { type: "text", text: altSummary };
+    }
+
+    const res = await liffInstance.shareTargetPicker([messagePayload]);
+    if (res) {
+      return {
+        success: true,
+        message: "ส่ง LINE Flex Message ไปยังเพื่อน/กลุ่มที่เลือกสำเร็จแล้ว",
+      };
+    }
+    return { success: false, message: "ยกเลิกการเลือกห้องแชทใน LINE" };
+  } catch (err: unknown) {
+    const errMsg = err instanceof Error ? err.message : String(err);
+    return { success: false, message: `เกิดข้อผิดพลาดจาก LINE: ${errMsg}` };
+  }
 }
 
 /**
@@ -206,8 +310,14 @@ export async function sendWith3TierFallback(
   const { summary, flexMessage, target = "group", toUserIdOrGroupId, isBroadcast } = options;
   let tier1ErrorReason = "";
 
+  const tokenToUse =
+    options.channelAccessToken ||
+    (typeof window !== "undefined"
+      ? localStorage.getItem("minimark_line_channel_token") || undefined
+      : undefined);
+
   // ─────────────────────────────────────────────────────────────
-  // Tier 1: Server LINE Messaging API
+  // Tier 1: Server LINE Messaging API (Sends REAL Flex Message)
   // ─────────────────────────────────────────────────────────────
   try {
     const serverRes = await sendLineMessagingApiFn({
@@ -216,6 +326,7 @@ export async function sendWith3TierFallback(
         flexMessage,
         toUserIdOrGroupId,
         isBroadcast,
+        channelAccessToken: tokenToUse,
       },
     });
 
@@ -224,12 +335,12 @@ export async function sendWith3TierFallback(
         success: true,
         channel: "server_api",
         tier: 1,
-        message: "ส่งข้อความผ่าน Server LINE Messaging API สำเร็จ (Tier 1)",
+        message: "ส่ง Flex Message ผ่าน Server LINE Messaging API สำเร็จ (Tier 1)",
       };
     } else {
       tier1ErrorReason = serverRes.error || "Server LINE Messaging API ไม่พร้อมใช้งาน";
       console.warn(
-        `[3-Tier Fallback] Tier 1 (Server API) unavailable: ${tier1ErrorReason}. Cascading to Tier 2 (LIFF)...`,
+        `[3-Tier Fallback] Tier 1 unavailable: ${tier1ErrorReason}. Cascading to Tier 2 (LIFF)...`,
       );
     }
   } catch (err: unknown) {
@@ -249,8 +360,8 @@ export async function sendWith3TierFallback(
       if (initialized && liffInstance) {
         const messagePayload = flexMessage || { type: "text", text: summary };
 
-        // 2a. shareTargetPicker (allows choosing LINE group or chat room)
-        if (liffInstance.isApiAvailable("shareTargetPicker")) {
+        // 2a. shareTargetPicker (sends REAL Flex Message inside LINE)
+        if (liffInstance.isApiAvailable("shareTargetPicker") && liffInstance.isLoggedIn()) {
           try {
             const pickerRes = await liffInstance.shareTargetPicker([messagePayload]);
             if (pickerRes) {
@@ -258,7 +369,7 @@ export async function sendWith3TierFallback(
                 success: true,
                 channel: "liff_picker",
                 tier: 2,
-                message: `ส่งเข้า LINE (${target === "group" ? "กลุ่ม" : "ส่วนตัว"}) ผ่าน LIFF Target Picker สำเร็จ (Tier 2)`,
+                message: `ส่ง Flex Message เข้า LINE (${target === "group" ? "กลุ่ม" : "ส่วนตัว"}) ผ่าน LIFF Target Picker สำเร็จ (Tier 2)`,
                 fallbackReason: tier1ErrorReason,
               };
             }
@@ -298,8 +409,21 @@ export async function sendWith3TierFallback(
     }
   }
 
+  // If intent fallback is explicitly disabled, report the exact error
+  if (options.disableIntentFallback) {
+    return {
+      success: false,
+      channel: "server_api",
+      tier: 1,
+      message:
+        tier1ErrorReason ||
+        "ไม่สามารถส่ง Flex Message ได้ กรุณาตรวจสอบ Channel Access Token หรือ User ID / Group ID",
+      fallbackReason: tier1ErrorReason,
+    };
+  }
+
   // ─────────────────────────────────────────────────────────────
-  // Tier 3: Web Share Intent (https://line.me/R/share)
+  // Tier 3: Web Share Intent (https://line.me/R/share) - Plain Text Fallback
   // ─────────────────────────────────────────────────────────────
   const lineIntentUrl = `https://line.me/R/share?text=${encodeURIComponent(summary)}`;
   if (typeof window !== "undefined") {
@@ -316,7 +440,7 @@ export async function sendWith3TierFallback(
     success: true,
     channel: "line_intent",
     tier: 3,
-    message: `เปิดหน้าแชร์ LINE (Web Share Intent) สำเร็จ (Tier 3 Fallback)`,
+    message: `เปิดหน้าแชร์ LINE ด้วยข้อความธรรมดา (Web Share Intent) สำเร็จ (Tier 3 Fallback)`,
     fallbackReason: tier1ErrorReason,
   };
 }

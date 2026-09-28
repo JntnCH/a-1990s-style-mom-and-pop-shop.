@@ -79,7 +79,7 @@ export function createPurchaseOrderFlexBubble(
     altText: `📦 ${note} (${totalItems} ชิ้น) - ${storeName}`,
     contents: {
       type: "bubble" as const,
-      size: "giga" as const,
+      size: "mega" as const,
       header: {
         type: "box" as const,
         layout: "vertical" as const,

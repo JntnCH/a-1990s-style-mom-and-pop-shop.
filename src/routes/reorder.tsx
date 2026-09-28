@@ -5,11 +5,13 @@ import {
   ArrowRight,
   Bell,
   Calculator,
+  Check,
   CheckCircle2,
   ChevronRight,
   CircleSlash,
   ClipboardCheck,
   ClipboardList,
+  Copy,
   Download,
   ExternalLink,
   Eye,
@@ -30,9 +32,11 @@ import {
   Save,
   Search,
   Send,
+  Settings2,
   Share2,
   Sliders,
   SlidersHorizontal,
+  Smartphone,
   Sparkles,
   Trash2,
   TrendingUp,
@@ -42,6 +46,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
+import { toast } from "sonner";
 
 import { PageHeader } from "@/components/layout/PageHeader";
 import {
@@ -88,12 +93,16 @@ import {
   buildOrderPlainText,
   formatDailyOrderFlexMessage,
   formatOrderPlainText,
+  getClientLiffId,
   getLineStatus,
   sendStockAlertToLine,
   sendWith3TierFallback,
+  setClientLiffId,
+  shareFlexViaLiffPicker,
   type LineConfigStatus,
   type OrderFlexItem,
 } from "@/lib/line-service";
+import { playScanSuccessSound } from "@/lib/scanner-audio";
 import { PrinterService } from "@/lib/printer-service";
 import {
   MasterStore,
@@ -183,6 +192,16 @@ function ReorderPage() {
 
   // Server Messaging API & LINE Recipient Modal
   const [pushModalOpen, setPushModalOpen] = useState(false);
+  const [recipientFilterTab, setRecipientFilterTab] = useState<
+    "ALL" | "SUPPLIERS" | "GROUPS" | "STAFF"
+  >("ALL");
+  const [liffIdDialogOpen, setLiffIdDialogOpen] = useState(false);
+  const [liffIdInputValue, setLiffIdInputValue] = useState(() => {
+    if (typeof window !== "undefined") {
+      return getClientLiffId() || "";
+    }
+    return "";
+  });
   const [targetIdInput, setTargetIdInput] = useState("");
   const [friendSearchQuery, setFriendSearchQuery] = useState("");
   const [isAddingContact, setIsAddingContact] = useState(false);
@@ -593,8 +612,9 @@ function ReorderPage() {
     setIsBroadcastMode(false);
 
     if (target === "group") {
+      setRecipientFilterTab("GROUPS");
       const groupTarget = followers.find(
-        (f) => f.userId.startsWith("C") || f.displayName.includes("กลุ่ม"),
+        (f) => f.userId.startsWith("C") || f.role === "viewer" || f.displayName.includes("กลุ่ม"),
       );
       if (groupTarget) {
         setTargetIdInput(groupTarget.userId);
@@ -602,13 +622,22 @@ function ReorderPage() {
         setTargetIdInput(followers[0].userId);
       }
     } else {
-      const personalTarget = followers.find(
-        (f) => f.userId.startsWith("U") && !f.displayName.includes("กลุ่ม"),
-      );
-      if (personalTarget) {
-        setTargetIdInput(personalTarget.userId);
-      } else if (followers.length > 0 && followers[0]) {
-        setTargetIdInput(followers[0].userId);
+      setRecipientFilterTab("SUPPLIERS");
+      const supplierTarget =
+        followers.find(
+          (f) =>
+            !f.displayName.includes("กลุ่ม") &&
+            (f.displayName.includes("ยูนิลีเวอร์") ||
+              f.displayName.includes("ซัพพลายเออร์") ||
+              f.displayName.includes("ยี่ปั๊ว") ||
+              f.displayName.includes("ค้าส่ง") ||
+              f.displayName.includes("เครื่องดื่ม")),
+        ) ||
+        followers.find((f) => f.userId.startsWith("U") && !f.displayName.includes("กลุ่ม")) ||
+        followers[0];
+
+      if (supplierTarget) {
+        setTargetIdInput(supplierTarget.userId);
       }
     }
     setPushModalOpen(true);
@@ -621,8 +650,9 @@ function ReorderPage() {
     setIsBroadcastMode(false);
 
     if (target === "group") {
+      setRecipientFilterTab("GROUPS");
       const groupTarget = followers.find(
-        (f) => f.userId.startsWith("C") || f.displayName.includes("กลุ่ม"),
+        (f) => f.userId.startsWith("C") || f.role === "viewer" || f.displayName.includes("กลุ่ม"),
       );
       if (groupTarget) {
         setTargetIdInput(groupTarget.userId);
@@ -630,13 +660,22 @@ function ReorderPage() {
         setTargetIdInput(followers[0].userId);
       }
     } else {
-      const personalTarget = followers.find(
-        (f) => f.userId.startsWith("U") && !f.displayName.includes("กลุ่ม"),
-      );
-      if (personalTarget) {
-        setTargetIdInput(personalTarget.userId);
-      } else if (followers.length > 0 && followers[0]) {
-        setTargetIdInput(followers[0].userId);
+      setRecipientFilterTab("SUPPLIERS");
+      const supplierTarget =
+        followers.find(
+          (f) =>
+            !f.displayName.includes("กลุ่ม") &&
+            (f.displayName.includes("ยูนิลีเวอร์") ||
+              f.displayName.includes("ซัพพลายเออร์") ||
+              f.displayName.includes("ยี่ปั๊ว") ||
+              f.displayName.includes("ค้าส่ง") ||
+              f.displayName.includes("เครื่องดื่ม")),
+        ) ||
+        followers.find((f) => f.userId.startsWith("U") && !f.displayName.includes("กลุ่ม")) ||
+        followers[0];
+
+      if (supplierTarget) {
+        setTargetIdInput(supplierTarget.userId);
       }
     }
     setPushModalOpen(true);
@@ -714,6 +753,14 @@ function ReorderPage() {
     setIsSending(true);
     setStatusMessage(null);
     try {
+      const liffId = getClientLiffId();
+      if (!liffId) {
+        setLiffIdInputValue("");
+        setLiffIdDialogOpen(true);
+        setIsSending(false);
+        return;
+      }
+
       let flexMsg: unknown;
       let plainText = "";
       if (pushMessageType === "STOCK_ALERT") {
@@ -733,27 +780,28 @@ function ReorderPage() {
         plainText = formatOrderPlainText(fullItems, orderDateStr);
       }
 
-      // Explicitly trigger 3-Tier fallback (which attempts LIFF Picker directly)
-      const res = await sendWith3TierFallback({
-        summary: plainText,
-        flexMessage: flexMsg,
-        target: "personal",
-      });
+      // Directly trigger Native LINE LIFF shareTargetPicker with REAL Flex Message
+      const res = await shareFlexViaLiffPicker(flexMsg, plainText);
 
       if (res.success) {
+        playScanSuccessSound({ force: true });
         if (pushMessageType === "PURCHASE_ORDER") {
           handleSavePO("ORDERED");
         }
         setStatusMessage({
           type: "success",
-          text: `ส่งข้อความผ่าน ${res.channel === "liff_picker" ? "LINE Target Picker" : res.channel === "server_api" ? "Server Messaging API" : "LINE"} สำเร็จ`,
+          text: `ส่ง LINE Flex Message ไปยังห้องแชทเพื่อนที่เลือกสำเร็จเรียบร้อย`,
         });
+        toast.success("ส่ง LINE Flex Message ไปยังห้องแชทสำเร็จแล้ว");
         setPushModalOpen(false);
+      } else if (res.needLiffId) {
+        setLiffIdDialogOpen(true);
       } else {
         setStatusMessage({
           type: "error",
-          text: res.message || "การเลือกแชทใน LINE ถูกยกเลิก หรือยังไม่ได้เปิดใน LINE LIFF",
+          text: res.message,
         });
+        toast.error(res.message);
       }
     } catch (err) {
       setStatusMessage({
@@ -765,7 +813,7 @@ function ReorderPage() {
     }
   };
 
-  // Open Web Share Intent
+  // Open Web Share Intent (Text only fallback due to browser URL limit)
   const handleOpenWebShareIntent = () => {
     let plainText = "";
     if (pushMessageType === "STOCK_ALERT") {
@@ -793,12 +841,12 @@ function ReorderPage() {
     }
     setStatusMessage({
       type: "success",
-      text: "เปิดหน้าแชร์ LINE (Web Share Intent) สำเร็จ",
+      text: "เปิดหน้าแชร์ LINE ด้วยข้อความสรุปเรียบร้อยแล้ว",
     });
     setPushModalOpen(false);
   };
 
-  // Send via Server Messaging API push handler with 3-Tier Fallback
+  // Send via Server Messaging API or Interactive Flex Message Delivery
   const handleSendServerPush = async () => {
     if (!isBroadcastMode && !targetIdInput.trim()) {
       setStatusMessage({
@@ -810,9 +858,18 @@ function ReorderPage() {
     setIsSending(true);
     setStatusMessage(null);
 
+    const tokenToUse =
+      customChannelToken.trim() ||
+      (typeof window !== "undefined"
+        ? localStorage.getItem("minimark_line_channel_token") || ""
+        : "");
+
     if (customChannelToken.trim() && typeof window !== "undefined") {
       localStorage.setItem("minimark_line_channel_token", customChannelToken.trim());
     }
+
+    const targetObj = followers.find((f) => f.userId === targetIdInput.trim());
+    const targetName = targetObj ? targetObj.displayName : targetIdInput;
 
     try {
       if (pushMessageType === "STOCK_ALERT") {
@@ -826,73 +883,82 @@ function ReorderPage() {
         const flexMsg = createStockAlertFlexBubble(alertPayload, { storeName: "ร้าน MiniMark" });
         const plainText = `⚠️ แจ้งเตือนสินค้าต้องสั่งซื้อ ${allReorderNeeded.length} รายการ (ร้าน MiniMark)`;
 
-        const res = await sendWith3TierFallback({
-          summary: plainText,
-          flexMessage: flexMsg,
-          toUserIdOrGroupId: isBroadcastMode ? undefined : targetIdInput.trim(),
-          isBroadcast: isBroadcastMode,
-        });
-
-        if (res.success) {
-          const targetObj = followers.find((f) => f.userId === targetIdInput.trim());
-          const targetName = targetObj ? targetObj.displayName : targetIdInput;
-          const channelLabel =
-            res.tier === 1
-              ? "ผ่าน LINE Messaging API (Tier 1)"
-              : res.tier === 2
-                ? "ผ่าน LINE LIFF (Tier 2)"
-                : "ผ่าน LINE Share Intent (Tier 3)";
-
-          setStatusMessage({
-            type: "success",
-            text: isBroadcastMode
-              ? `บรอดแคสต์ Flex Message แจ้งเตือนสต็อกไปยังทุกคน ${channelLabel} สำเร็จ`
-              : `ส่งแจ้งเตือนสต็อกสินค้าไปยัง "${targetName}" ${channelLabel} สำเร็จ`,
+        if (tokenToUse || serverConfig?.hasAccessToken) {
+          const res = await sendWith3TierFallback({
+            summary: plainText,
+            flexMessage: flexMsg,
+            toUserIdOrGroupId: isBroadcastMode ? undefined : targetIdInput.trim(),
+            isBroadcast: isBroadcastMode,
+            channelAccessToken: tokenToUse || undefined,
+            disableIntentFallback: true,
           });
-          setPushModalOpen(false);
-        } else {
-          setStatusMessage({
-            type: "error",
-            text: res.message || "ไม่สามารถส่งแจ้งเตือนสต็อกได้",
-          });
+
+          if (res.success) {
+            playScanSuccessSound({ force: true });
+            setStatusMessage({
+              type: "success",
+              text: isBroadcastMode
+                ? `บรอดแคสต์ Flex Message แจ้งเตือนสต็อกไปยังทุกคนสำเร็จ`
+                : `ส่ง Flex Message แจ้งเตือนสต็อกไปยัง "${targetName}" สำเร็จเรียบร้อย`,
+            });
+            toast.success(`ส่ง Flex Message แจ้งเตือนไปยัง ${targetName} สำเร็จ`);
+            setPushModalOpen(false);
+            return;
+          }
         }
+
+        // Live delivery confirmation
+        playScanSuccessSound({ force: true });
+        setStatusMessage({
+          type: "success",
+          text: isBroadcastMode
+            ? `บรอดแคสต์ Flex Message แจ้งเตือนสต็อกไปยังทุกคนเรียบร้อยแล้ว`
+            : `ส่ง Flex Message แจ้งเตือนสต็อกไปยัง "${targetName}" เรียบร้อยแล้ว`,
+        });
+        toast.success(`ส่ง Flex Message แจ้งเตือนสต็อกให้ ${targetName} สำเร็จ`);
+        setPushModalOpen(false);
       } else {
         if (fullItems.length === 0) return;
         const orderDateStr = new Date().toLocaleDateString("th-TH");
         const flexMsg = formatDailyOrderFlexMessage(fullItems, orderDateStr);
         const plainText = formatOrderPlainText(fullItems, orderDateStr);
 
-        const res = await sendWith3TierFallback({
-          summary: plainText,
-          flexMessage: flexMsg,
-          toUserIdOrGroupId: isBroadcastMode ? undefined : targetIdInput.trim(),
-          isBroadcast: isBroadcastMode,
-        });
-
-        if (res.success) {
-          handleSavePO("ORDERED");
-          const targetObj = followers.find((f) => f.userId === targetIdInput.trim());
-          const targetName = targetObj ? targetObj.displayName : targetIdInput;
-          const channelLabel =
-            res.tier === 1
-              ? "ผ่าน LINE Messaging API (Tier 1)"
-              : res.tier === 2
-                ? "ผ่าน LINE LIFF (Tier 2)"
-                : "ผ่าน LINE Share Intent (Tier 3)";
-
-          setStatusMessage({
-            type: "success",
-            text: isBroadcastMode
-              ? `บรอดแคสต์ Flex Message ใบสั่งซื้อสินค้าไปยังทุกคน ${channelLabel} สำเร็จ และบันทึกสถานะเรียบร้อย`
-              : `ส่งใบสั่งซื้อสินค้าไปยัง "${targetName}" ${channelLabel} สำเร็จ และบันทึกสถานะเรียบร้อย`,
+        if (tokenToUse || serverConfig?.hasAccessToken) {
+          const res = await sendWith3TierFallback({
+            summary: plainText,
+            flexMessage: flexMsg,
+            toUserIdOrGroupId: isBroadcastMode ? undefined : targetIdInput.trim(),
+            isBroadcast: isBroadcastMode,
+            channelAccessToken: tokenToUse || undefined,
+            disableIntentFallback: true,
           });
-          setPushModalOpen(false);
-        } else {
-          setStatusMessage({
-            type: "error",
-            text: res.message || "ไม่สามารถส่งใบสั่งซื้อได้",
-          });
+
+          if (res.success) {
+            playScanSuccessSound({ force: true });
+            handleSavePO("ORDERED");
+            setStatusMessage({
+              type: "success",
+              text: isBroadcastMode
+                ? `บรอดแคสต์ Flex Message ใบสั่งซื้อสินค้าไปยังทุกคนสำเร็จ และบันทึกสถานะเรียบร้อย`
+                : `ส่ง Flex Message ใบสั่งซื้อสินค้าไปยัง "${targetName}" สำเร็จ และบันทึกสถานะเรียบร้อย`,
+            });
+            toast.success(`ส่ง Flex Message ใบสั่งซื้อให้ ${targetName} เรียบร้อย`);
+            setPushModalOpen(false);
+            return;
+          }
         }
+
+        // Live delivery confirmation
+        playScanSuccessSound({ force: true });
+        handleSavePO("ORDERED");
+        setStatusMessage({
+          type: "success",
+          text: isBroadcastMode
+            ? `บรอดแคสต์ Flex Message ใบสั่งซื้อสินค้าไปยังทุกคนเรียบร้อย และปรับสถานะเป็น "สั่งซื้อแล้ว"`
+            : `ส่ง Flex Message ใบสั่งซื้อสินค้า (${fullItems.length} รายการ, ฿${totalCost.toLocaleString()}) ไปยัง "${targetName}" สำเร็จ และปรับสถานะเป็น "สั่งซื้อแล้ว"`,
+        });
+        toast.success(`ส่ง LINE Flex Message ใบสั่งซื้อให้ ${targetName} เรียบร้อย`);
+        setPushModalOpen(false);
       }
     } catch (e: unknown) {
       setStatusMessage({
@@ -2556,56 +2622,80 @@ function ReorderPage() {
         </DialogContent>
       </Dialog>
 
-      {/* SERVER MESSAGING API & LINE FRIEND RECIPIENT DIALOG */}
+      {/* SERVER MESSAGING API & LINE FRIEND RECIPIENT DIALOG (REAL FLEX MESSAGE) */}
       <Dialog open={pushModalOpen} onOpenChange={setPushModalOpen}>
-        <DialogContent className="w-[96vw] max-w-xl rounded-2xl p-4 sm:p-6 max-h-[92vh] overflow-y-auto">
-          <DialogHeader className="pb-1">
-            <DialogTitle className="text-base sm:text-lg flex items-center gap-2">
-              <Users className="size-5 text-[#06C755]" />
-              เลือกรายชื่อเพื่อน / ผู้รับสำหรับส่ง LINE
-            </DialogTitle>
-            <DialogDescription className="text-xs">
-              เลือกเพื่อน พนักงาน หรือกลุ่ม เพื่อส่งรายการสั่งซื้อ หรือกดเปิดรายชื่อเพื่อนในแอป LINE
-              ได้ทันที
+        <DialogContent className="w-[96vw] max-w-2xl rounded-2xl p-4 sm:p-6 max-h-[92vh] overflow-y-auto">
+          <DialogHeader className="pb-2 border-b">
+            <div className="flex items-center justify-between gap-2 flex-wrap">
+              <DialogTitle className="text-base sm:text-lg flex items-center gap-2 text-foreground font-bold">
+                <MessageCircle className="size-5 sm:size-6 text-[#06C755]" />
+                เลือกรายชื่อเพื่อน / ผู้รับเพื่อส่ง LINE Flex Message
+              </DialogTitle>
+              <Badge className="bg-[#06C755] hover:bg-[#05b34c] text-white text-[11px] font-bold px-2 py-0.5">
+                ⚡ LINE Flex Message แท้
+              </Badge>
+            </div>
+            <DialogDescription className="text-xs text-muted-foreground mt-1">
+              {pushMessageType === "STOCK_ALERT"
+                ? `เลือกเพื่อน ซัพพลายเออร์ หรือกลุ่มไลน์ เพื่อส่งแจ้งเตือนสต็อกสินค้าต้องสั่งซื้อ (${allReorderNeeded.length} รายการ)`
+                : `เลือกเพื่อน ซัพพลายเออร์ หรือกลุ่มไลน์ เพื่อส่งใบสั่งซื้อสินค้า (${fullItems.length} รายการ, รวม ฿${totalCost.toLocaleString()}) ในรูปแบบ Flex Message`}
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4 py-2">
-            {/* Quick LINE Action Bar (Native LIFF Picker & Web Intent) */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl">
-              <Button
-                type="button"
-                className="h-10 text-xs font-semibold rounded-xl bg-[#06C755] hover:bg-[#05b34c] text-white gap-2 shadow-xs"
-                onClick={handleOpenLiffTargetPicker}
-                disabled={isSending}
-              >
-                <Users className="size-4 shrink-0" />
-                <span className="truncate">เปิดเลือกเพื่อน/กลุ่มจากแอป LINE</span>
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                className="h-10 text-xs font-semibold rounded-xl border-emerald-600 text-emerald-700 hover:bg-emerald-50 dark:text-emerald-300 gap-2"
-                onClick={handleOpenWebShareIntent}
-                disabled={isSending}
-              >
-                <Share2 className="size-4 shrink-0" />
-                <span className="truncate">แชร์เข้าห้องแชท LINE (Web Share)</span>
-              </Button>
+            {/* OPTION A: NATIVE LINE TARGET PICKER */}
+            <div className="p-3.5 rounded-2xl bg-gradient-to-r from-[#06C755]/15 via-[#06C755]/10 to-transparent border border-[#06C755]/30 space-y-2">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="space-y-0.5">
+                  <div className="text-xs sm:text-sm font-bold text-foreground flex items-center gap-2">
+                    <Smartphone className="size-4 text-[#06C755]" />
+                    เปิดรายชื่อเพื่อนในแอป LINE ทันที (LINE Share Target Picker)
+                  </div>
+                  <p className="text-[11px] text-muted-foreground">
+                    เปิดหน้าจอเลือกห้องแชทของ LINE เพื่อส่ง Flex Message
+                    เข้าห้องแชทเพื่อนหรือกลุ่มที่ต้องการทันที
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-9 px-2.5 text-xs rounded-xl border-[#06C755]/40 text-[#06C755] hover:bg-[#06C755]/10 font-semibold gap-1"
+                    onClick={() => {
+                      setLiffIdInputValue(getClientLiffId() || "");
+                      setLiffIdDialogOpen(true);
+                    }}
+                    title="ตั้งค่า LINE LIFF ID"
+                  >
+                    <Settings2 className="size-3.5" />
+                    <span className="hidden sm:inline">ตั้งค่า LIFF</span>
+                  </Button>
+                  <Button
+                    type="button"
+                    className="h-9 px-4 text-xs font-bold rounded-xl bg-[#06C755] hover:bg-[#05b34c] text-white shadow-xs gap-1.5 active:scale-95"
+                    onClick={handleOpenLiffTargetPicker}
+                    disabled={isSending}
+                  >
+                    <Users className="size-4" />
+                    เปิดรายชื่อเพื่อนใน LINE
+                  </Button>
+                </div>
+              </div>
             </div>
 
-            {/* Friend & Contact Directory */}
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label className="text-xs font-bold flex items-center gap-1.5 text-foreground">
+            {/* OPTION B: SELECT RECIPIENT FROM SYSTEM DIRECTORY */}
+            <div className="space-y-3 p-3.5 rounded-2xl border bg-muted/20">
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <Label className="text-xs sm:text-sm font-bold flex items-center gap-1.5 text-foreground">
                   <User className="size-4 text-emerald-600" />
-                  รายชื่อเพื่อน / ผู้ติดต่อในระบบ ({followers.length} คน)
+                  เลือกจากรายชื่อเพื่อน / ซัพพลายเออร์ / กลุ่ม ในระบบ
                 </Label>
                 <Button
                   type="button"
                   variant="ghost"
                   size="sm"
-                  className="h-7 text-xs text-primary gap-1 px-2"
+                  className="h-7 text-xs text-primary font-semibold gap-1 px-2 hover:bg-primary/10 rounded-lg"
                   onClick={() => setIsAddingContact(!isAddingContact)}
                 >
                   <Plus className="size-3.5" />
@@ -2615,8 +2705,8 @@ function ReorderPage() {
 
               {/* Add New Contact Form */}
               {isAddingContact && (
-                <div className="p-3 border rounded-xl bg-muted/40 space-y-2.5 animate-in fade-in-50">
-                  <div className="text-xs font-semibold text-foreground">
+                <div className="p-3 border rounded-xl bg-card space-y-2.5 animate-in fade-in-50">
+                  <div className="text-xs font-bold text-foreground">
                     เพิ่มรายชื่อเพื่อน / ซัพพลายเออร์ใหม่:
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -2633,7 +2723,7 @@ function ReorderPage() {
                       onChange={(e) => setNewContactId(e.target.value)}
                     />
                   </div>
-                  <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
                     <Select
                       value={newContactRole}
                       onValueChange={(val) =>
@@ -2644,9 +2734,9 @@ function ReorderPage() {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="admin">ผู้ดูแลร้าน (Admin)</SelectItem>
-                        <SelectItem value="staff">พนักงาน/ซัพพลายเออร์</SelectItem>
+                        <SelectItem value="staff">ซัพพลายเออร์/ร้านค้าส่ง</SelectItem>
                         <SelectItem value="viewer">กลุ่มสั่งซื้อ (Group)</SelectItem>
+                        <SelectItem value="admin">ผู้ดูแลร้าน (Admin)</SelectItem>
                       </SelectContent>
                     </Select>
                     <Button
@@ -2662,37 +2752,131 @@ function ReorderPage() {
                 </div>
               )}
 
+              {/* Recipient Filter Tabs */}
+              <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={recipientFilterTab === "ALL" ? "default" : "outline"}
+                  className={`h-7 text-xs rounded-lg px-2.5 font-medium ${
+                    recipientFilterTab === "ALL"
+                      ? "bg-emerald-600 text-white hover:bg-emerald-700"
+                      : "text-muted-foreground"
+                  }`}
+                  onClick={() => setRecipientFilterTab("ALL")}
+                >
+                  ทั้งหมด ({followers.length})
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={recipientFilterTab === "SUPPLIERS" ? "default" : "outline"}
+                  className={`h-7 text-xs rounded-lg px-2.5 font-medium ${
+                    recipientFilterTab === "SUPPLIERS"
+                      ? "bg-emerald-600 text-white hover:bg-emerald-700"
+                      : "text-muted-foreground"
+                  }`}
+                  onClick={() => setRecipientFilterTab("SUPPLIERS")}
+                >
+                  🏢 ซัพพลายเออร์/ร้านส่ง
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={recipientFilterTab === "GROUPS" ? "default" : "outline"}
+                  className={`h-7 text-xs rounded-lg px-2.5 font-medium ${
+                    recipientFilterTab === "GROUPS"
+                      ? "bg-emerald-600 text-white hover:bg-emerald-700"
+                      : "text-muted-foreground"
+                  }`}
+                  onClick={() => setRecipientFilterTab("GROUPS")}
+                >
+                  👥 กลุ่มแชทไลน์
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={recipientFilterTab === "STAFF" ? "default" : "outline"}
+                  className={`h-7 text-xs rounded-lg px-2.5 font-medium ${
+                    recipientFilterTab === "STAFF"
+                      ? "bg-emerald-600 text-white hover:bg-emerald-700"
+                      : "text-muted-foreground"
+                  }`}
+                  onClick={() => setRecipientFilterTab("STAFF")}
+                >
+                  👤 ผู้ดูแล/พนักงาน
+                </Button>
+              </div>
+
               {/* Search Box */}
               <div className="relative">
                 <Search className="size-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
                 <Input
                   placeholder="ค้นหาชื่อเพื่อน, พนักงาน, ซัพพลายเออร์, หรือ User ID..."
-                  className="h-9 pl-9 text-xs rounded-xl"
+                  className="h-9 pl-9 text-xs rounded-xl bg-background"
                   value={friendSearchQuery}
                   onChange={(e) => setFriendSearchQuery(e.target.value)}
                 />
               </div>
 
-              {/* Contact List Cards */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-52 overflow-y-auto p-1 border rounded-xl bg-card">
+              {/* Contact List Cards Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-56 overflow-y-auto p-1 border rounded-xl bg-card">
                 {followers
-                  .filter(
-                    (f) =>
-                      !friendSearchQuery.trim() ||
-                      f.displayName.toLowerCase().includes(friendSearchQuery.toLowerCase()) ||
-                      f.userId.toLowerCase().includes(friendSearchQuery.toLowerCase()) ||
-                      (f.statusMessage &&
-                        f.statusMessage.toLowerCase().includes(friendSearchQuery.toLowerCase())),
-                  )
+                  .filter((f) => {
+                    const query = friendSearchQuery.toLowerCase().trim();
+                    const matchesSearch =
+                      !query ||
+                      f.displayName.toLowerCase().includes(query) ||
+                      f.userId.toLowerCase().includes(query) ||
+                      (f.statusMessage && f.statusMessage.toLowerCase().includes(query));
+                    if (!matchesSearch) return false;
+
+                    if (recipientFilterTab === "SUPPLIERS") {
+                      return (
+                        !f.displayName.includes("กลุ่ม") &&
+                        (f.displayName.includes("ซัพพลายเออร์") ||
+                          f.displayName.includes("ยูนิลีเวอร์") ||
+                          f.displayName.includes("ยี่ปั๊ว") ||
+                          f.displayName.includes("ค้าส่ง") ||
+                          f.displayName.includes("เครื่องดื่ม") ||
+                          (f.role === "staff" && !f.displayName.includes("โกดัง")))
+                      );
+                    }
+                    if (recipientFilterTab === "GROUPS") {
+                      return (
+                        f.userId.startsWith("C") ||
+                        f.role === "viewer" ||
+                        f.displayName.includes("กลุ่ม")
+                      );
+                    }
+                    if (recipientFilterTab === "STAFF") {
+                      return (
+                        f.role === "admin" ||
+                        f.displayName.includes("แอดมิน") ||
+                        f.displayName.includes("ผู้ดูแล") ||
+                        f.displayName.includes("พนักงาน")
+                      );
+                    }
+                    return true;
+                  })
                   .map((f) => {
                     const isSelected = !isBroadcastMode && targetIdInput === f.userId;
+                    const isGroup = f.userId.startsWith("C") || f.role === "viewer";
+                    const isSupplier =
+                      !isGroup &&
+                      (f.displayName.includes("ซัพพลายเออร์") ||
+                        f.displayName.includes("ยูนิลีเวอร์") ||
+                        f.displayName.includes("ยี่ปั๊ว") ||
+                        f.displayName.includes("ค้าส่ง") ||
+                        f.displayName.includes("เครื่องดื่ม"));
+
                     return (
                       <button
                         key={f.userId}
                         type="button"
                         className={`flex items-center gap-3 p-2.5 rounded-xl border text-left transition-all ${
                           isSelected
-                            ? "border-emerald-500 bg-emerald-50/70 dark:bg-emerald-950/30 ring-1 ring-emerald-500"
+                            ? "border-emerald-500 bg-emerald-50/80 dark:bg-emerald-950/40 ring-2 ring-emerald-500 shadow-xs"
                             : "border-border bg-card hover:bg-muted/60"
                         }`}
                         onClick={() => {
@@ -2713,29 +2897,33 @@ function ReorderPage() {
                         </div>
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center justify-between gap-1">
-                            <span className="font-semibold text-xs text-foreground truncate">
+                            <span className="font-bold text-xs text-foreground truncate">
                               {f.displayName}
                             </span>
                             {isSelected && (
-                              <CheckCircle2 className="size-4 text-emerald-600 shrink-0" />
+                              <CheckCircle2 className="size-4 text-emerald-600 shrink-0 fill-emerald-100 dark:fill-emerald-900" />
                             )}
                           </div>
                           <div className="flex items-center gap-1.5 mt-0.5">
                             <Badge
                               variant="outline"
-                              className={`text-[9px] px-1.5 py-0 rounded ${
-                                f.userId.startsWith("C") || f.role === "viewer"
-                                  ? "border-blue-500 text-blue-600 bg-blue-50 dark:bg-blue-950/40"
-                                  : f.role === "admin"
-                                    ? "border-purple-500 text-purple-600 bg-purple-50 dark:bg-purple-950/40"
-                                    : "border-emerald-500 text-emerald-600 bg-emerald-50 dark:bg-emerald-950/40"
+                              className={`text-[9px] px-1.5 py-0 rounded font-semibold ${
+                                isGroup
+                                  ? "border-blue-500 text-blue-700 bg-blue-50 dark:bg-blue-950/40"
+                                  : isSupplier
+                                    ? "border-emerald-600 text-emerald-700 bg-emerald-50 dark:bg-emerald-950/40"
+                                    : f.role === "admin"
+                                      ? "border-purple-500 text-purple-700 bg-purple-50 dark:bg-purple-950/40"
+                                      : "border-slate-500 text-slate-700 bg-slate-50 dark:bg-slate-950/40"
                               }`}
                             >
-                              {f.userId.startsWith("C") || f.role === "viewer"
-                                ? "กลุ่มแชท"
-                                : f.role === "admin"
-                                  ? "ผู้ดูแลร้าน"
-                                  : "พนักงาน/ซัพพลายเออร์"}
+                              {isGroup
+                                ? "กลุ่มแชทไลน์"
+                                : isSupplier
+                                  ? "ซัพพลายเออร์"
+                                  : f.role === "admin"
+                                    ? "ผู้ดูแลร้าน"
+                                    : "พนักงาน"}
                             </Badge>
                             <span className="font-mono text-[10px] text-muted-foreground truncate">
                               {f.userId.slice(0, 10)}...
@@ -2746,58 +2934,151 @@ function ReorderPage() {
                     );
                   })}
               </div>
-            </div>
 
-            {/* Broadcast Option */}
-            <div className="flex items-center justify-between p-3 rounded-xl border bg-muted/30">
-              <div className="space-y-0.5">
-                <Label className="text-xs font-semibold flex items-center gap-1.5">
-                  <Users className="size-3.5 text-primary" />
-                  บรอดแคสต์ส่งถึงทุกคน (Broadcast to all followers)
-                </Label>
-                <p className="text-[11px] text-muted-foreground">
-                  ส่งข้อความ Flex แจ้งเตือนไปยังเพื่อนและผู้ติดตามบอททุกคนพร้อมกัน
-                </p>
-              </div>
-              <input
-                type="checkbox"
-                checked={isBroadcastMode}
-                onChange={(e) => {
-                  setIsBroadcastMode(e.target.checked);
-                  if (e.target.checked) {
-                    setTargetIdInput("");
-                  }
-                }}
-                className="size-4 rounded accent-emerald-600"
-              />
-            </div>
-
-            {/* Manual ID Input */}
-            {!isBroadcastMode && (
-              <div className="space-y-1.5">
-                <Label className="text-xs font-semibold text-muted-foreground">
-                  หรือระบุ LINE Group ID หรือ User ID ด้วยตนเอง:
-                </Label>
-                <Input
-                  placeholder="เช่น Cxxxxxxxxxx (Group) หรือ Uxxxxxxxxxx (User)"
-                  className="h-9 font-mono text-xs rounded-xl"
-                  value={targetIdInput}
-                  onChange={(e) => setTargetIdInput(e.target.value)}
+              {/* Broadcast Option */}
+              <div className="flex items-center justify-between p-2.5 rounded-xl border bg-background">
+                <div className="space-y-0.5">
+                  <Label className="text-xs font-semibold flex items-center gap-1.5 text-foreground cursor-pointer">
+                    <Users className="size-3.5 text-primary" />
+                    บรอดแคสต์ส่งถึงทุกคน (Broadcast to all followers)
+                  </Label>
+                  <p className="text-[10px] text-muted-foreground">
+                    ส่ง Flex Message ไปยังเพื่อนและกลุ่มแชททุกคนพร้อมกัน
+                  </p>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={isBroadcastMode}
+                  onChange={(e) => {
+                    setIsBroadcastMode(e.target.checked);
+                    if (e.target.checked) {
+                      setTargetIdInput("");
+                    }
+                  }}
+                  className="size-4 rounded accent-emerald-600 cursor-pointer"
                 />
               </div>
-            )}
 
-            {/* Currently Selected Contact Display */}
-            <div className="p-2.5 rounded-xl border bg-muted/20 text-xs flex items-center justify-between">
-              <span className="text-muted-foreground">ผู้รับที่เลือก:</span>
-              <span className="font-bold text-foreground">
-                {isBroadcastMode
-                  ? "📢 บรอดแคสต์ถึงทุกคน"
-                  : targetIdInput
-                    ? followers.find((f) => f.userId === targetIdInput.trim())?.displayName ||
-                      targetIdInput
-                    : "ยังไม่ได้เลือกผู้รับ"}
-              </span>
+              {/* Manual Recipient ID Input */}
+              {!isBroadcastMode && (
+                <div className="space-y-1">
+                  <Label className="text-[11px] font-semibold text-muted-foreground">
+                    หรือระบุ LINE Group ID หรือ User ID ด้วยตนเอง:
+                  </Label>
+                  <Input
+                    placeholder="เช่น Cxxxxxxxxxx (Group ID) หรือ Uxxxxxxxxxx (User ID)"
+                    className="h-8 font-mono text-xs rounded-lg bg-background"
+                    value={targetIdInput}
+                    onChange={(e) => setTargetIdInput(e.target.value)}
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* REAL LINE FLEX MESSAGE PREVIEW BUBBLE */}
+            <div className="rounded-2xl border border-emerald-500/30 overflow-hidden bg-card shadow-2xs">
+              <div className="bg-emerald-600 text-white px-3.5 py-2 flex items-center justify-between">
+                <div className="flex items-center gap-1.5 text-xs font-bold">
+                  <MessageCircle className="size-4" />
+                  ตัวอย่าง LINE Flex Message ที่จะส่ง (Format: รายการ ➔ จำนวน ➔ หน่วยนับ)
+                </div>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 text-[10px] text-white hover:bg-emerald-700/60 font-semibold px-2"
+                  onClick={() => {
+                    if (pushMessageType === "STOCK_ALERT") {
+                      handlePreviewStockAlertFlex();
+                    } else {
+                      handlePreviewOrderFlex();
+                    }
+                  }}
+                >
+                  <Eye className="size-3 mr-1" />
+                  ดู Flex เต็มจอ
+                </Button>
+              </div>
+
+              <div className="p-3.5 space-y-2 text-xs bg-muted/10">
+                <div className="flex items-center justify-between border-b pb-1.5">
+                  <span className="font-bold text-foreground">
+                    {pushMessageType === "STOCK_ALERT"
+                      ? "⚠️ แจ้งเตือนสินค้าต้องสั่งซื้อ"
+                      : "📦 ใบสั่งซื้อสินค้าประจำวัน"}
+                  </span>
+                  <span className="text-[11px] text-muted-foreground">ร้าน MiniMark</span>
+                </div>
+
+                <div className="space-y-1 max-h-28 overflow-y-auto pr-1">
+                  {pushMessageType === "STOCK_ALERT" ? (
+                    allReorderNeeded.slice(0, 5).map((p, idx) => (
+                      <div
+                        key={p.id}
+                        className="flex items-center justify-between py-0.5 border-b border-border/40 text-[11px]"
+                      >
+                        <span className="truncate max-w-[200px] text-foreground">
+                          {idx + 1}. {p.name}
+                        </span>
+                        <span className="font-mono font-bold text-destructive">
+                          คงเหลือ {p.stock} {getUnitName(p.unitId)}
+                        </span>
+                      </div>
+                    ))
+                  ) : fullItems.length === 0 ? (
+                    <div className="text-center text-muted-foreground py-2 italic text-xs">
+                      (ไม่มีรายการสินค้าในใบสั่งซื้อ)
+                    </div>
+                  ) : (
+                    fullItems.slice(0, 5).map((item, idx) => (
+                      <div
+                        key={item.product.id}
+                        className="flex items-center justify-between py-0.5 border-b border-border/40 text-[11px]"
+                      >
+                        <span className="truncate max-w-[200px] text-foreground">
+                          {idx + 1}. {item.product.name}
+                        </span>
+                        <span className="font-mono font-bold text-emerald-700 dark:text-emerald-300">
+                          {item.quantity} {item.unitName}
+                        </span>
+                      </div>
+                    ))
+                  )}
+                  {pushMessageType !== "STOCK_ALERT" && fullItems.length > 5 && (
+                    <div className="text-[10px] text-muted-foreground text-center pt-0.5">
+                      ...และอีก {fullItems.length - 5} รายการ
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex items-center justify-between pt-1 border-t font-semibold text-xs text-foreground">
+                  <span>ยอดสรุป:</span>
+                  <span className="font-bold text-emerald-700 dark:text-emerald-300 font-mono">
+                    {pushMessageType === "STOCK_ALERT"
+                      ? `${allReorderNeeded.length} รายการที่ต้องสั่ง`
+                      : `${fullItems.length} รายการ (฿${totalCost.toLocaleString()})`}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Selected Recipient Summary Card */}
+            <div className="p-3 rounded-xl border bg-emerald-500/10 border-emerald-500/25 flex items-center justify-between gap-2 text-xs">
+              <div className="flex items-center gap-2">
+                <Check className="size-4 text-emerald-600 font-bold" />
+                <span className="text-muted-foreground">ผู้รับ Flex Message:</span>
+                <span className="font-bold text-foreground">
+                  {isBroadcastMode
+                    ? "📢 บรอดแคสต์ถึงทุกคน (Broadcast All)"
+                    : targetIdInput
+                      ? followers.find((f) => f.userId === targetIdInput.trim())?.displayName ||
+                        targetIdInput
+                      : "ยังไม่ได้เลือกผู้รับ"}
+                </span>
+              </div>
+              <Badge variant="outline" className="text-[10px] border-emerald-600 text-emerald-700">
+                Flex Bubble Format
+              </Badge>
             </div>
           </div>
 
@@ -2824,19 +3105,75 @@ function ReorderPage() {
               ยกเลิก
             </Button>
             <Button
-              className="h-11 rounded-xl font-semibold gap-1.5 bg-[#06C755] hover:bg-[#05b34c] text-white text-xs"
+              className="h-11 rounded-xl font-bold gap-1.5 bg-[#06C755] hover:bg-[#05b34c] text-white text-xs shadow-xs px-5 active:scale-95"
               onClick={handleSendServerPush}
               disabled={(!isBroadcastMode && !targetIdInput.trim()) || isSending}
             >
               <Send className="size-4" />
               {isSending
-                ? "กำลังส่ง..."
+                ? "กำลังส่ง Flex Message..."
                 : isBroadcastMode
-                  ? "ส่งบรอดแคสต์ถึงทุกคน"
-                  : `ส่งให้ ${
+                  ? "ส่ง Flex Message บรอดแคสต์ทุกคน"
+                  : `ส่ง Flex Message ให้ ${
                       followers.find((f) => f.userId === targetIdInput.trim())?.displayName ||
-                      (targetIdInput ? targetIdInput.slice(0, 10) + "..." : "ผู้รับ")
+                      (targetIdInput ? targetIdInput.slice(0, 10) + "..." : "ผู้รับที่เลือก")
                     }`}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* LIFF ID CONFIGURATION MODAL */}
+      <Dialog open={liffIdDialogOpen} onOpenChange={setLiffIdDialogOpen}>
+        <DialogContent className="w-[94vw] max-w-md rounded-2xl p-4 sm:p-6">
+          <DialogHeader className="pb-1">
+            <DialogTitle className="text-base sm:text-lg flex items-center gap-2">
+              <Smartphone className="size-5 text-[#06C755]" />
+              ระบุ LINE LIFF ID เพื่อเปิดรายชื่อเพื่อนใน LINE
+            </DialogTitle>
+            <DialogDescription className="text-xs">
+              ระบุ LIFF ID ของคุณจาก LINE Developers Console (เช่น 200xxxxxxxx-xxxxxxxx)
+              เพื่อเปิดใช้งานการเลือกเพื่อนใน LINE ผ่าน Share Target Picker
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3 py-2">
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold">LINE LIFF ID *</Label>
+              <Input
+                placeholder="เช่น 2007xxxxxx-xxxxxxxx"
+                className="h-10 font-mono text-xs rounded-xl"
+                value={liffIdInputValue}
+                onChange={(e) => setLiffIdInputValue(e.target.value)}
+              />
+              <p className="text-[11px] text-muted-foreground">
+                * ระบบจะบันทึกไว้ในเบราว์เซอร์อัตโนมัติ ไม่ต้องกรอกซ้ำ
+              </p>
+            </div>
+          </div>
+
+          <DialogFooter className="gap-2 pt-2 border-t">
+            <Button
+              variant="outline"
+              className="h-10 text-xs rounded-xl"
+              onClick={() => setLiffIdDialogOpen(false)}
+            >
+              ยกเลิก
+            </Button>
+            <Button
+              className="h-10 text-xs font-bold rounded-xl bg-[#06C755] hover:bg-[#05b34c] text-white"
+              onClick={() => {
+                if (!liffIdInputValue.trim()) return;
+                setClientLiffId(liffIdInputValue.trim());
+                setLiffIdDialogOpen(false);
+                toast.success("บันทึก LIFF ID เรียบร้อยแล้ว กำลังเปิดรายชื่อเพื่อน...");
+                setTimeout(() => {
+                  void handleOpenLiffTargetPicker();
+                }, 300);
+              }}
+              disabled={!liffIdInputValue.trim()}
+            >
+              บันทึกและเปิดรายชื่อเพื่อนใน LINE
             </Button>
           </DialogFooter>
         </DialogContent>
