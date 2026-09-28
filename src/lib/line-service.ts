@@ -31,12 +31,26 @@ export interface LineConfigStatus {
 
 let memoryLiffId: string | null = null;
 
-// Retrieve LIFF ID from memory, localStorage, Vite env, or runtime config
+// Retrieve LIFF ID from memory, URL params, localStorage, Vite env, or runtime config
 export function getClientLiffId(): string | null {
   if (memoryLiffId && memoryLiffId.trim() && memoryLiffId.trim() !== "xxxxx-xxxxx") {
     return memoryLiffId.trim();
   }
   if (typeof window !== "undefined") {
+    // 1. Check URL parameters (e.g. ?liffId=... or ?liff_id=...)
+    try {
+      const urlParams = new URLSearchParams(window.location.search);
+      const paramId =
+        urlParams.get("liffId") || urlParams.get("liff_id") || urlParams.get("liffID");
+      if (paramId && paramId.trim() && paramId.trim() !== "xxxxx-xxxxx") {
+        setClientLiffId(paramId.trim());
+        return paramId.trim();
+      }
+    } catch {
+      // ignore
+    }
+
+    // 2. Check window cached object
     const w = window as unknown as { __MINIMARK_LIFF_ID?: string };
     if (
       w.__MINIMARK_LIFF_ID &&
@@ -46,6 +60,8 @@ export function getClientLiffId(): string | null {
       memoryLiffId = w.__MINIMARK_LIFF_ID.trim();
       return memoryLiffId;
     }
+
+    // 3. Check localStorage
     const local = localStorage.getItem("minimark_line_liff_id");
     if (local && local.trim() && local.trim() !== "xxxxx-xxxxx") {
       memoryLiffId = local.trim();

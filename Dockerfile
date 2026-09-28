@@ -13,8 +13,22 @@ RUN npm install
 # Copy full application code
 COPY . .
 
-# Build application for node-server
+# Build application for node-server with environment variables injected
+ARG VITE_LINE_LIFF_ID
+ARG LINE_LIFF_ID
+ARG LINE_CHANNEL_ACCESS_TOKEN
+ARG LINE_CHANNEL_SECRET
+ARG LINE_CHANNEL_ID
+ARG LINE_TO_ID
+
+ENV VITE_LINE_LIFF_ID=$VITE_LINE_LIFF_ID
+ENV LINE_LIFF_ID=$LINE_LIFF_ID
+ENV LINE_CHANNEL_ACCESS_TOKEN=$LINE_CHANNEL_ACCESS_TOKEN
+ENV LINE_CHANNEL_SECRET=$LINE_CHANNEL_SECRET
+ENV LINE_CHANNEL_ID=$LINE_CHANNEL_ID
+ENV LINE_TO_ID=$LINE_TO_ID
 ENV NODE_ENV=production
+
 RUN npm run build
 
 # Runner stage - lightweight production image

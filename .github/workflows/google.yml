@@ -71,6 +71,13 @@ jobs:
         with:
           context: "."
           push: true
+          build-args: |
+            VITE_LINE_LIFF_ID=${{ secrets.VITE_LINE_LIFF_ID || secrets.LINE_LIFF_ID }}
+            LINE_LIFF_ID=${{ secrets.LINE_LIFF_ID || secrets.VITE_LINE_LIFF_ID }}
+            LINE_CHANNEL_ACCESS_TOKEN=${{ secrets.LINE_CHANNEL_ACCESS_TOKEN }}
+            LINE_CHANNEL_SECRET=${{ secrets.LINE_CHANNEL_SECRET }}
+            LINE_CHANNEL_ID=${{ secrets.LINE_CHANNEL_ID }}
+            LINE_TO_ID=${{ secrets.LINE_TO_ID }}
           tags: |
             ${{ env.GAR_LOCATION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
             ${{ env.GAR_LOCATION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE_NAME }}:latest
@@ -84,6 +91,13 @@ jobs:
           image: "${{ env.GAR_LOCATION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}"
           region: "${{ env.REGION }}"
           flags: "--allow-unauthenticated --port=8080 --cpu=1 --memory=512Mi --min-instances=1 --max-instances=2"
+          env_vars: |
+            LINE_LIFF_ID=${{ secrets.LINE_LIFF_ID || secrets.VITE_LINE_LIFF_ID }}
+            VITE_LINE_LIFF_ID=${{ secrets.VITE_LINE_LIFF_ID || secrets.LINE_LIFF_ID }}
+            LINE_CHANNEL_ACCESS_TOKEN=${{ secrets.LINE_CHANNEL_ACCESS_TOKEN }}
+            LINE_CHANNEL_SECRET=${{ secrets.LINE_CHANNEL_SECRET }}
+            LINE_CHANNEL_ID=${{ secrets.LINE_CHANNEL_ID }}
+            LINE_TO_ID=${{ secrets.LINE_TO_ID }}
 
       # Explicitly grant public unauthenticated access (allUsers)
       - name: "Ensure Public Access (allUsers)"
