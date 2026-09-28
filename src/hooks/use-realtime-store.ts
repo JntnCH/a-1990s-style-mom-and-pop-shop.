@@ -1,5 +1,13 @@
 import { useEffect, useState, useCallback } from "react";
-import { MasterStore, type ProductItem, type ZoneItem, type CategoryItem, type UnitItem, type PurchaseOrderRecord, type StockMovementLog } from "@/lib/store";
+import {
+  MasterStore,
+  type ProductItem,
+  type ZoneItem,
+  type CategoryItem,
+  type UnitItem,
+  type PurchaseOrderRecord,
+  type StockMovementLog,
+} from "@/lib/store";
 
 /**
  * Custom hook to subscribe to real-time changes in MasterStore

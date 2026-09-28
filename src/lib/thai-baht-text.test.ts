@@ -22,9 +22,7 @@ describe("thaiBahtText (FlowAccount & Revenue Dept standard)", () => {
 
 describe("calculateDocumentTotals (VAT 7% & Withholding Tax)", () => {
   it("calculates VAT Included (7%) correctly", () => {
-    const items = [
-      { quantity: 1, unitPrice: 107 },
-    ];
+    const items = [{ quantity: 1, unitPrice: 107 }];
     const res = calculateDocumentTotals(items, "INCLUDED", 7, 0, 0);
     expect(res.grandTotal).toBe(107);
     expect(res.preVatAmount).toBe(100);
@@ -32,9 +30,7 @@ describe("calculateDocumentTotals (VAT 7% & Withholding Tax)", () => {
   });
 
   it("calculates VAT Excluded (7%) correctly", () => {
-    const items = [
-      { quantity: 2, unitPrice: 500 },
-    ];
+    const items = [{ quantity: 2, unitPrice: 500 }];
     const res = calculateDocumentTotals(items, "EXCLUDED", 7, 0, 0);
     expect(res.subtotal).toBe(1000);
     expect(res.vatAmount).toBe(70);
@@ -42,9 +38,7 @@ describe("calculateDocumentTotals (VAT 7% & Withholding Tax)", () => {
   });
 
   it("calculates Withholding Tax (WHT 3%) correctly", () => {
-    const items = [
-      { quantity: 1, unitPrice: 1000 },
-    ];
+    const items = [{ quantity: 1, unitPrice: 1000 }];
     const res = calculateDocumentTotals(items, "EXCLUDED", 7, 3, 0);
     expect(res.grandTotal).toBe(1070);
     expect(res.withholdingTaxAmount).toBe(30); // 3% of 1000 base

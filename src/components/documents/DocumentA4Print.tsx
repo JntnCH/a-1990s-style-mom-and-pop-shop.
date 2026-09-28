@@ -39,13 +39,29 @@ export function DocumentA4Print({
   const getDocTitle = () => {
     switch (doc.type) {
       case "QUOTATION":
-        return { th: "ใบเสนอราคา", en: "QUOTATION", color: "border-sky-500 text-sky-700 bg-sky-50" };
+        return {
+          th: "ใบเสนอราคา",
+          en: "QUOTATION",
+          color: "border-sky-500 text-sky-700 bg-sky-50",
+        };
       case "BILLING_INVOICE":
-        return { th: "ใบแจ้งหนี้ / ใบวางบิล", en: "INVOICE / BILLING NOTE", color: "border-indigo-500 text-indigo-700 bg-indigo-50" };
+        return {
+          th: "ใบแจ้งหนี้ / ใบวางบิล",
+          en: "INVOICE / BILLING NOTE",
+          color: "border-indigo-500 text-indigo-700 bg-indigo-50",
+        };
       case "TAX_INVOICE_RECEIPT":
-        return { th: "ใบเสร็จรับเงิน / ใบกำกับภาษี", en: "RECEIPT / TAX INVOICE", color: "border-emerald-600 text-emerald-800 bg-emerald-50" };
+        return {
+          th: "ใบเสร็จรับเงิน / ใบกำกับภาษี",
+          en: "RECEIPT / TAX INVOICE",
+          color: "border-emerald-600 text-emerald-800 bg-emerald-50",
+        };
       case "CREDIT_NOTE":
-        return { th: "ใบลดหนี้ / ใบกำกับภาษี", en: "CREDIT NOTE", color: "border-rose-500 text-rose-700 bg-rose-50" };
+        return {
+          th: "ใบลดหนี้ / ใบกำกับภาษี",
+          en: "CREDIT NOTE",
+          color: "border-rose-500 text-rose-700 bg-rose-50",
+        };
     }
   };
 
@@ -78,12 +94,7 @@ export function DocumentA4Print({
             <Printer className="size-4 text-primary" /> พิมพ์เอกสาร A4
           </Button>
           {onClose && (
-            <Button
-              size="icon"
-              variant="ghost"
-              className="rounded-full size-8"
-              onClick={onClose}
-            >
+            <Button size="icon" variant="ghost" className="rounded-full size-8" onClick={onClose}>
               <X className="size-4" />
             </Button>
           )}
@@ -105,9 +116,7 @@ export function DocumentA4Print({
                 M
               </div>
               <div>
-                <h1 className="text-lg font-bold text-slate-900 leading-tight">
-                  {company.name}
-                </h1>
+                <h1 className="text-lg font-bold text-slate-900 leading-tight">{company.name}</h1>
                 <p className="text-[11px] text-slate-500 font-medium">
                   {company.branchType === "HEAD_OFFICE"
                     ? "สำนักงานใหญ่ (Head Office)"
@@ -137,12 +146,8 @@ export function DocumentA4Print({
             <div
               className={`border-2 rounded-xl px-4 py-2 text-center sm:text-right shadow-sm ${titleInfo.color}`}
             >
-              <h2 className="text-base sm:text-lg font-extrabold leading-tight">
-                {titleInfo.th}
-              </h2>
-              <p className="text-[10px] font-bold tracking-widest opacity-85">
-                {titleInfo.en}
-              </p>
+              <h2 className="text-base sm:text-lg font-extrabold leading-tight">{titleInfo.th}</h2>
+              <p className="text-[10px] font-bold tracking-widest opacity-85">{titleInfo.en}</p>
             </div>
 
             <div className="bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-[11px] space-y-1 text-slate-700">
@@ -332,9 +337,7 @@ export function DocumentA4Print({
             )}
 
             <div className="flex justify-between border-t border-slate-200 pt-1">
-              <span className="text-slate-500">
-                ราคาหลังหักส่วนลด:
-              </span>
+              <span className="text-slate-500">ราคาหลังหักส่วนลด:</span>
               <span className="font-mono">
                 {doc.calculation.afterDiscount.toLocaleString("th-TH", {
                   minimumFractionDigits: 2,
@@ -347,11 +350,13 @@ export function DocumentA4Print({
               <span>
                 ภาษีมูลค่าเพิ่ม VAT {doc.calculation.vatRate}%{" "}
                 <span className="text-[10px]">
-                  ({doc.calculation.vatType === "INCLUDED"
+                  (
+                  {doc.calculation.vatType === "INCLUDED"
                     ? "รวมใน"
                     : doc.calculation.vatType === "EXCLUDED"
-                    ? "แยกนอก"
-                    : "ยกเว้น"})
+                      ? "แยกนอก"
+                      : "ยกเว้น"}
+                  )
                 </span>
                 :
               </span>

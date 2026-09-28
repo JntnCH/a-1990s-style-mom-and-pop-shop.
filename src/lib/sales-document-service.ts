@@ -299,7 +299,11 @@ class SalesDocumentManager {
     };
 
     // Auto deduct stock if it's a paid TAX_INVOICE_RECEIPT
-    if (newDoc.type === "TAX_INVOICE_RECEIPT" && newDoc.status === "PAID" && !newDoc.stockDeducted) {
+    if (
+      newDoc.type === "TAX_INVOICE_RECEIPT" &&
+      newDoc.status === "PAID" &&
+      !newDoc.stockDeducted
+    ) {
       this.deductStockForDoc(newDoc);
       newDoc.stockDeducted = true;
     }
@@ -353,10 +357,7 @@ class SalesDocumentManager {
    * FlowAccount-style convert flow:
    * Quotation -> Billing Invoice -> Tax Invoice/Receipt
    */
-  public convertDocument(
-    sourceDocId: string,
-    targetType: DocumentType,
-  ): SalesDocument | null {
+  public convertDocument(sourceDocId: string, targetType: DocumentType): SalesDocument | null {
     this.ensureLoaded();
     const source = this.getDocumentById(sourceDocId);
     if (!source) return null;
@@ -379,7 +380,10 @@ class SalesDocumentManager {
       referenceDocNumber: source.docNumber,
       referenceDocId: source.id,
       customer: { ...source.customer },
-      items: source.items.map((it) => ({ ...it, id: `item_${Math.random().toString(36).slice(2, 7)}` })),
+      items: source.items.map((it) => ({
+        ...it,
+        id: `item_${Math.random().toString(36).slice(2, 7)}`,
+      })),
       calculation: { ...source.calculation },
       paymentMethod: targetType === "TAX_INVOICE_RECEIPT" ? "BANK_TRANSFER" : undefined,
       paymentDate: targetType === "TAX_INVOICE_RECEIPT" ? issueDate : undefined,
@@ -499,7 +503,8 @@ class SalesDocumentManager {
           taxId: "0107558000123",
           branchType: "HEAD_OFFICE",
           branchCode: "00000",
-          address: "99/1 อาคารสยามทาวเวอร์ ชั้น 18 ถนนพระราม 9 แขวงห้วยขวาง เขตห้วยขวาง กรุงเทพฯ 10310",
+          address:
+            "99/1 อาคารสยามทาวเวอร์ ชั้น 18 ถนนพระราม 9 แขวงห้วยขวาง เขตห้วยขวาง กรุงเทพฯ 10310",
           phone: "02-123-4567",
           email: "procurement@siamsynergy.co.th",
           contactPerson: "คุณสมชาย มุ่งมั่น",
@@ -556,7 +561,8 @@ class SalesDocumentManager {
           taxId: "0105559088776",
           branchType: "HEAD_OFFICE",
           branchCode: "00000",
-          address: "88 อาคารเพรสทีจ ซอยทองหล่อ 13 ถนนสุขุมวิท 55 แขวงคลองตันเหนือ เขตวัฒนา กรุงเทพฯ 10110",
+          address:
+            "88 อาคารเพรสทีจ ซอยทองหล่อ 13 ถนนสุขุมวิท 55 แขวงคลองตันเหนือ เขตวัฒนา กรุงเทพฯ 10110",
           phone: "02-777-8899",
           email: "purchase@tassaniya.com",
           contactPerson: "คุณกมลวรรณ สุขุม",

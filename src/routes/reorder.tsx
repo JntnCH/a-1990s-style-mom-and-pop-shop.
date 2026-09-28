@@ -618,7 +618,8 @@ function ReorderPage() {
 
       if (res.success) {
         MasterStore.updatePurchaseOrderStatus(savedPO.id, "ORDERED", {
-          sentViaLineAt: new Date().toLocaleDateString("th-TH") + " " + new Date().toLocaleTimeString("th-TH"),
+          sentViaLineAt:
+            new Date().toLocaleDateString("th-TH") + " " + new Date().toLocaleTimeString("th-TH"),
         });
         reloadData();
 

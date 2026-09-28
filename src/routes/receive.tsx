@@ -361,7 +361,9 @@ function ReceiveCheckPage() {
   // Summary Metrics
   const totalItemsCount = items.length;
   const receivedItemsCount = items.filter((it) => it.isReceived && it.receivedQuantity > 0).length;
-  const missingItemsCount = items.filter((it) => !it.isReceived || it.receivedQuantity === 0).length;
+  const missingItemsCount = items.filter(
+    (it) => !it.isReceived || it.receivedQuantity === 0,
+  ).length;
   const shortItemsCount = items.filter(
     (it) => it.isReceived && it.expectedQuantity > 0 && it.receivedQuantity < it.expectedQuantity,
   ).length;
@@ -437,10 +439,14 @@ function ReceiveCheckPage() {
                   <ScanLine className="size-5 text-primary" /> กล้องสแกนตรวจรับ
                 </span>
                 <Badge
-                  variant={scanStatus === "scanning" || scanStatus === "starting" ? "default" : "outline"}
+                  variant={
+                    scanStatus === "scanning" || scanStatus === "starting" ? "default" : "outline"
+                  }
                   className="text-[11px]"
                 >
-                  {scanStatus === "scanning" || scanStatus === "starting" ? "กล้องทำงาน" : "กล้องปิด"}
+                  {scanStatus === "scanning" || scanStatus === "starting"
+                    ? "กล้องทำงาน"
+                    : "กล้องปิด"}
                 </Badge>
               </CardTitle>
             </CardHeader>
@@ -496,7 +502,11 @@ function ReceiveCheckPage() {
                         className="h-10 px-3 rounded-xl font-semibold"
                         onClick={() => void toggleTorch()}
                       >
-                        {isTorchOn ? <FlashlightOff className="size-4" /> : <Flashlight className="size-4" />}
+                        {isTorchOn ? (
+                          <FlashlightOff className="size-4" />
+                        ) : (
+                          <Flashlight className="size-4" />
+                        )}
                       </Button>
                     )}
                   </>
@@ -551,7 +561,9 @@ function ReceiveCheckPage() {
             </div>
 
             <div className="space-y-1.5">
-              <Label className="text-xs text-muted-foreground">เลือกใบสั่งซื้อที่ต้องการตรวจรับ</Label>
+              <Label className="text-xs text-muted-foreground">
+                เลือกใบสั่งซื้อที่ต้องการตรวจรับ
+              </Label>
               <select
                 className="w-full rounded-xl border border-input bg-background px-3 py-2 text-xs shadow-xs"
                 value={selectedPoId}
@@ -562,7 +574,8 @@ function ReceiveCheckPage() {
                   .filter((p) => p.status === "ORDERED" || p.status === "DRAFT")
                   .map((po) => (
                     <option key={po.id} value={po.id}>
-                      {po.orderNumber} ({po.supplierName || "ซัพพลายเออร์"}) • {po.items.length} รายการ
+                      {po.orderNumber} ({po.supplierName || "ซัพพลายเออร์"}) • {po.items.length}{" "}
+                      รายการ
                     </option>
                   ))}
               </select>
@@ -586,7 +599,8 @@ function ReceiveCheckPage() {
             <CardHeader className="p-4 pb-3 border-b flex flex-row items-center justify-between gap-2 flex-wrap">
               <div>
                 <CardTitle className="text-base flex items-center gap-2">
-                  <ClipboardCheck className="size-5 text-primary" /> รายการตรวจสอบสินค้าเข้า (Checklist)
+                  <ClipboardCheck className="size-5 text-primary" /> รายการตรวจสอบสินค้าเข้า
+                  (Checklist)
                 </CardTitle>
                 <CardDescription className="text-xs">
                   เช็คการได้รับสินค้า, จำนวนที่ได้มา, คำนวณส่วนต่างขาด/เกิน และเลือกหน่วยนับ
@@ -636,7 +650,8 @@ function ReceiveCheckPage() {
                       ยังไม่มีรายการสินค้าในรอบตรวจรับนี้
                     </p>
                     <p className="text-xs max-w-sm mx-auto">
-                      สแกนบาร์โค้ดผ่านกล้อง, เลือกใบสั่งซื้อจากเมนูด้านซ้าย หรือคลิก "+ เพิ่มรายการตรวจรับเอง"
+                      สแกนบาร์โค้ดผ่านกล้อง, เลือกใบสั่งซื้อจากเมนูด้านซ้าย หรือคลิก "+
+                      เพิ่มรายการตรวจรับเอง"
                     </p>
                   </div>
                   <Button
@@ -849,7 +864,8 @@ function ReceiveCheckPage() {
                       className="h-11 rounded-xl font-bold gap-2 flex-1 sm:flex-initial bg-emerald-600 hover:bg-emerald-700 text-white shadow-md active:scale-95"
                       onClick={handleSaveToStock}
                     >
-                      <PackageCheck className="size-5" /> บันทึกตรวจรับเข้าสต็อก ({totalReceivedUnits} ชิ้น)
+                      <PackageCheck className="size-5" /> บันทึกตรวจรับเข้าสต็อก (
+                      {totalReceivedUnits} ชิ้น)
                     </Button>
                   </div>
                 </div>

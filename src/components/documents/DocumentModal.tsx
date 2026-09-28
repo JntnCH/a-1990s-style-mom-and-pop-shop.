@@ -69,8 +69,7 @@ export function DocumentModal({
   );
   const [creditDays, setCreditDays] = useState<number>(editingDoc?.creditDays || 30);
   const [dueDate, setDueDate] = useState<string>(
-    editingDoc?.dueDate ||
-      new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10),
+    editingDoc?.dueDate || new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10),
   );
 
   // Customer
@@ -114,7 +113,9 @@ export function DocumentModal({
     editingDoc?.termsAndConditions ||
       "1. ราคานี้ยังไม่รวมค่าขนส่ง (หากมียอดไม่ถึงเกณฑ์)\n2. สินค้าตามใบกำกับภาษีนี้ยังเป็นกรรมสิทธิ์ของผู้ขายจนกว่าจะได้รับการชำระเงินครบถ้วน",
   );
-  const [salesPerson, setSalesPerson] = useState<string>(editingDoc?.salesPerson || "พนักงานขายหน้าร้าน");
+  const [salesPerson, setSalesPerson] = useState<string>(
+    editingDoc?.salesPerson || "พนักงานขายหน้าร้าน",
+  );
 
   // Payment (if Tax Invoice or Paid)
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>(
@@ -178,11 +179,7 @@ export function DocumentModal({
     );
   };
 
-  const handleItemChange = (
-    id: string,
-    field: keyof DocumentItem,
-    val: string | number,
-  ) => {
+  const handleItemChange = (id: string, field: keyof DocumentItem, val: string | number) => {
     setItems((prev) =>
       prev.map((it) => {
         if (it.id === id) {
@@ -290,33 +287,30 @@ export function DocumentModal({
               </p>
             </div>
           </div>
-          <Button
-            size="icon"
-            variant="ghost"
-            className="rounded-full size-8"
-            onClick={onClose}
-          >
+          <Button size="icon" variant="ghost" className="rounded-full size-8" onClick={onClose}>
             <X className="size-4" />
           </Button>
         </div>
 
         {/* Scrollable Form Content */}
-        <form onSubmit={handleSubmit} className="overflow-y-auto p-6 space-y-6 flex-1 text-xs sm:text-sm">
+        <form
+          onSubmit={handleSubmit}
+          className="overflow-y-auto p-6 space-y-6 flex-1 text-xs sm:text-sm"
+        >
           {/* Top Config Row: Document Type & Dates */}
           <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 bg-muted/20 p-4 rounded-xl border border-border">
             <div className="space-y-1.5">
               <Label className="text-xs">ประเภทเอกสาร</Label>
-              <Select
-                value={docType}
-                onValueChange={(v) => setDocType(v as DocumentType)}
-              >
+              <Select value={docType} onValueChange={(v) => setDocType(v as DocumentType)}>
                 <SelectTrigger className="h-9">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="QUOTATION">ใบเสนอราคา (QT)</SelectItem>
                   <SelectItem value="BILLING_INVOICE">ใบแจ้งหนี้ / ใบวางบิล (INV)</SelectItem>
-                  <SelectItem value="TAX_INVOICE_RECEIPT">ใบเสร็จรับเงิน / ใบกำกับภาษี (TAX)</SelectItem>
+                  <SelectItem value="TAX_INVOICE_RECEIPT">
+                    ใบเสร็จรับเงิน / ใบกำกับภาษี (TAX)
+                  </SelectItem>
                   <SelectItem value="CREDIT_NOTE">ใบลดหนี้ (CN)</SelectItem>
                 </SelectContent>
               </Select>
@@ -324,10 +318,7 @@ export function DocumentModal({
 
             <div className="space-y-1.5">
               <Label className="text-xs">สถานะเอกสาร</Label>
-              <Select
-                value={docStatus}
-                onValueChange={(v) => setDocStatus(v as DocumentStatus)}
-              >
+              <Select value={docStatus} onValueChange={(v) => setDocStatus(v as DocumentStatus)}>
                 <SelectTrigger className="h-9">
                   <SelectValue />
                 </SelectTrigger>
@@ -379,7 +370,9 @@ export function DocumentModal({
                 <Building2 className="size-4 text-primary" /> ข้อมูลลูกค้า / ผู้ซื้อ
               </div>
               <Badge variant="outline" className="text-[10px]">
-                {customer.branchType === "HEAD_OFFICE" ? "สำนักงานใหญ่" : `สาขา ${customer.branchCode}`}
+                {customer.branchType === "HEAD_OFFICE"
+                  ? "สำนักงานใหญ่"
+                  : `สาขา ${customer.branchCode}`}
               </Badge>
             </div>
 
@@ -597,10 +590,7 @@ export function DocumentModal({
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
                   <Label className="text-xs font-semibold">การคิดภาษีมูลค่าเพิ่ม (VAT 7%)</Label>
-                  <Select
-                    value={vatType}
-                    onValueChange={(v) => setVatType(v as VatType)}
-                  >
+                  <Select value={vatType} onValueChange={(v) => setVatType(v as VatType)}>
                     <SelectTrigger className="h-9">
                       <SelectValue />
                     </SelectTrigger>
@@ -613,7 +603,9 @@ export function DocumentModal({
                 </div>
 
                 <div className="space-y-1.5">
-                  <Label className="text-xs font-semibold">หักภาษี ณ ที่จ่าย (Withholding Tax)</Label>
+                  <Label className="text-xs font-semibold">
+                    หักภาษี ณ ที่จ่าย (Withholding Tax)
+                  </Label>
                   <Select
                     value={String(withholdingTaxRate)}
                     onValueChange={(v) => setWithholdingTaxRate(Number(v))}
@@ -663,9 +655,7 @@ export function DocumentModal({
               </div>
 
               <div className="flex justify-between text-muted-foreground">
-                <span>
-                  ภาษีมูลค่าเพิ่ม (VAT {calculation.vatRate}%):
-                </span>
+                <span>ภาษีมูลค่าเพิ่ม (VAT {calculation.vatRate}%):</span>
                 <span className="font-mono font-medium text-foreground">
                   ฿{calculation.vatAmount.toLocaleString("th-TH", { minimumFractionDigits: 2 })}
                 </span>
@@ -682,7 +672,10 @@ export function DocumentModal({
                 <div className="flex justify-between text-rose-600 border-t border-dashed border-border pt-1.5">
                   <span>หัก ณ ที่จ่าย ({calculation.withholdingTaxRate}%):</span>
                   <span className="font-mono">
-                    -฿{calculation.withholdingTaxAmount.toLocaleString("th-TH", { minimumFractionDigits: 2 })}
+                    -฿
+                    {calculation.withholdingTaxAmount.toLocaleString("th-TH", {
+                      minimumFractionDigits: 2,
+                    })}
                   </span>
                 </div>
               )}
@@ -691,7 +684,10 @@ export function DocumentModal({
                 <div className="flex justify-between font-extrabold text-sm bg-emerald-50 dark:bg-emerald-950/40 p-2 rounded-lg border border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300">
                   <span>ยอดชำระสุทธิ:</span>
                   <span className="font-mono">
-                    ฿{calculation.netPaymentAmount.toLocaleString("th-TH", { minimumFractionDigits: 2 })}
+                    ฿
+                    {calculation.netPaymentAmount.toLocaleString("th-TH", {
+                      minimumFractionDigits: 2,
+                    })}
                   </span>
                 </div>
               )}
@@ -700,18 +696,10 @@ export function DocumentModal({
 
           {/* Footer Submit Buttons */}
           <div className="flex items-center justify-end gap-3 pt-3 border-t border-border">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={onClose}
-              className="rounded-xl px-4"
-            >
+            <Button type="button" variant="outline" onClick={onClose} className="rounded-xl px-4">
               ยกเลิก
             </Button>
-            <Button
-              type="submit"
-              className="rounded-xl px-6 gap-2 font-semibold shadow-md"
-            >
+            <Button type="submit" className="rounded-xl px-6 gap-2 font-semibold shadow-md">
               <Check className="size-4" />
               {editingDoc ? "บันทึกการแก้ไข" : "บันทึกเอกสาร"}
             </Button>

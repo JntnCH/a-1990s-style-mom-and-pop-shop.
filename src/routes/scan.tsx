@@ -59,11 +59,7 @@ import {
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useBarcodeScanner } from "@/hooks/use-barcode-scanner";
-import {
-  generateStoreBarcode,
-  inspectBarcode,
-  type BarcodeFormatType,
-} from "@/lib/barcode-engine";
+import { generateStoreBarcode, inspectBarcode, type BarcodeFormatType } from "@/lib/barcode-engine";
 import type { CodeType } from "@/lib/scanner-dedup";
 import {
   MasterStore,
@@ -522,7 +518,8 @@ function ScanPage() {
                               <Tag className="size-3.5 text-emerald-600" /> ราคาขายหน้าร้าน
                             </span>
                             <div className="text-2xl font-mono font-bold text-foreground">
-                              ฿{prod.sellPrice.toLocaleString("th-TH", { minimumFractionDigits: 2 })}
+                              ฿
+                              {prod.sellPrice.toLocaleString("th-TH", { minimumFractionDigits: 2 })}
                             </div>
                             <span className="text-[10px] text-muted-foreground">
                               ต่อ 1 {getUnitName(prod.unitId)}
@@ -532,10 +529,12 @@ function ScanPage() {
                           {/* Cost Price */}
                           <div className="p-3.5 rounded-xl border bg-muted/30 space-y-1">
                             <span className="text-xs text-muted-foreground flex items-center gap-1">
-                              <DollarSign className="size-3.5 text-muted-foreground" /> ราคาทุนสินค้า
+                              <DollarSign className="size-3.5 text-muted-foreground" />{" "}
+                              ราคาทุนสินค้า
                             </span>
                             <div className="text-2xl font-mono font-bold text-muted-foreground">
-                              ฿{prod.costPrice.toLocaleString("th-TH", { minimumFractionDigits: 2 })}
+                              ฿
+                              {prod.costPrice.toLocaleString("th-TH", { minimumFractionDigits: 2 })}
                             </div>
                             <span className="text-[10px] text-muted-foreground">ต้นทุนจัดซื้อ</span>
                           </div>
@@ -569,7 +568,8 @@ function ScanPage() {
                               โซนจัดเก็บ / ชั้นวาง:
                             </span>
                             <span className="font-semibold text-foreground flex items-center gap-1">
-                              <MapPin className="size-3.5 text-primary" /> {getZoneName(prod.zoneId)}
+                              <MapPin className="size-3.5 text-primary" />{" "}
+                              {getZoneName(prod.zoneId)}
                             </span>
                           </div>
                           <div>
@@ -791,7 +791,8 @@ function ScanPage() {
                     <Sparkles className="size-5 text-primary" /> เครื่องมือสร้างบาร์โค้ด
                   </CardTitle>
                   <CardDescription className="text-xs">
-                    สร้างบาร์โค้ด EAN-13 คำนวณ Check Digit อัตโนมัติ, Code 128 หรือ QR Code สำหรับพิมพ์ติดสินค้า
+                    สร้างบาร์โค้ด EAN-13 คำนวณ Check Digit อัตโนมัติ, Code 128 หรือ QR Code
+                    สำหรับพิมพ์ติดสินค้า
                   </CardDescription>
                 </CardHeader>
 
@@ -912,7 +913,8 @@ function ScanPage() {
                 <CardHeader className="bg-muted/40 pb-3">
                   <CardTitle className="text-base flex items-center justify-between">
                     <span className="flex items-center gap-2">
-                      <BarcodeIcon className="size-5 text-primary" /> ตัวอย่างฉลากบาร์โค้ด (Live Preview)
+                      <BarcodeIcon className="size-5 text-primary" /> ตัวอย่างฉลากบาร์โค้ด (Live
+                      Preview)
                     </span>
                     <Badge variant="outline" className="font-mono text-xs">
                       {genFormat}
@@ -941,10 +943,12 @@ function ScanPage() {
                 <ul className="list-disc pl-4 space-y-1 text-muted-foreground">
                   <li>
                     <strong>EAN-13:</strong> ขึ้นต้นด้วย <strong>885</strong> (ประเทศไทย) หรือ{" "}
-                    <strong>20-29</strong> (สินค้าชั่งน้ำหนัก/ใช้ภายในร้าน) โดยหลักที่ 13 คือ Check Digit
+                    <strong>20-29</strong> (สินค้าชั่งน้ำหนัก/ใช้ภายในร้าน) โดยหลักที่ 13 คือ Check
+                    Digit
                   </li>
                   <li>
-                    <strong>Code 128:</strong> เหมาะสำหรับบาร์โค้ดลังสินค้า, เลขที่ PO, รหัสเอกสาร และ SKU สินค้า
+                    <strong>Code 128:</strong> เหมาะสำหรับบาร์โค้ดลังสินค้า, เลขที่ PO, รหัสเอกสาร
+                    และ SKU สินค้า
                   </li>
                   <li>
                     <strong>QR Code:</strong> สแกนได้รอบทิศทาง 360 องศา บรรจุข้อมูลได้หลากหลาย

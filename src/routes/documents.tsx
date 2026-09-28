@@ -32,13 +32,7 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -174,9 +168,7 @@ function DocumentsPage() {
 
   const handleConvert = (doc: SalesDocument, targetType: DocumentType) => {
     const targetTitle =
-      targetType === "BILLING_INVOICE"
-        ? "ใบแจ้งหนี้/ใบวางบิล"
-        : "ใบเสร็จรับเงิน/ใบกำกับภาษี";
+      targetType === "BILLING_INVOICE" ? "ใบแจ้งหนี้/ใบวางบิล" : "ใบเสร็จรับเงิน/ใบกำกับภาษี";
 
     if (
       confirm(
@@ -244,25 +236,37 @@ function DocumentsPage() {
     switch (type) {
       case "QUOTATION":
         return (
-          <Badge variant="outline" className="border-sky-300 text-sky-700 dark:text-sky-400 bg-sky-50 dark:bg-sky-950/40 text-[10px] font-mono">
+          <Badge
+            variant="outline"
+            className="border-sky-300 text-sky-700 dark:text-sky-400 bg-sky-50 dark:bg-sky-950/40 text-[10px] font-mono"
+          >
             QT ใบเสนอราคา
           </Badge>
         );
       case "BILLING_INVOICE":
         return (
-          <Badge variant="outline" className="border-indigo-300 text-indigo-700 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/40 text-[10px] font-mono">
+          <Badge
+            variant="outline"
+            className="border-indigo-300 text-indigo-700 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/40 text-[10px] font-mono"
+          >
             INV ใบแจ้งหนี้
           </Badge>
         );
       case "TAX_INVOICE_RECEIPT":
         return (
-          <Badge variant="outline" className="border-emerald-300 text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 text-[10px] font-mono">
+          <Badge
+            variant="outline"
+            className="border-emerald-300 text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 text-[10px] font-mono"
+          >
             TAX ใบกำกับภาษี
           </Badge>
         );
       case "CREDIT_NOTE":
         return (
-          <Badge variant="outline" className="border-rose-300 text-rose-700 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/40 text-[10px] font-mono">
+          <Badge
+            variant="outline"
+            className="border-rose-300 text-rose-700 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/40 text-[10px] font-mono"
+          >
             CN ใบลดหนี้
           </Badge>
         );
@@ -310,7 +314,9 @@ function DocumentsPage() {
         {/* Total Sales */}
         <Card className="rounded-2xl border border-border shadow-sm">
           <CardHeader className="pb-2">
-            <CardDescription className="text-xs font-medium">ยอดขายรับชำระแล้ว (Tax Invoices)</CardDescription>
+            <CardDescription className="text-xs font-medium">
+              ยอดขายรับชำระแล้ว (Tax Invoices)
+            </CardDescription>
             <CardTitle className="text-xl sm:text-2xl font-extrabold text-emerald-600 dark:text-emerald-400 font-mono">
               ฿{metrics.totalSales.toLocaleString("th-TH", { minimumFractionDigits: 2 })}
             </CardTitle>
@@ -325,7 +331,9 @@ function DocumentsPage() {
         {/* Pending Receivables */}
         <Card className="rounded-2xl border border-border shadow-sm">
           <CardHeader className="pb-2">
-            <CardDescription className="text-xs font-medium">ลูกหนี้ค้างรับ (Pending Invoices)</CardDescription>
+            <CardDescription className="text-xs font-medium">
+              ลูกหนี้ค้างรับ (Pending Invoices)
+            </CardDescription>
             <CardTitle className="text-xl sm:text-2xl font-extrabold text-amber-600 dark:text-amber-400 font-mono">
               ฿{metrics.pendingReceivable.toLocaleString("th-TH", { minimumFractionDigits: 2 })}
             </CardTitle>
@@ -340,7 +348,9 @@ function DocumentsPage() {
         {/* VAT Collected */}
         <Card className="rounded-2xl border border-border shadow-sm">
           <CardHeader className="pb-2">
-            <CardDescription className="text-xs font-medium">ภาษีขายสะสม (Output VAT 7%)</CardDescription>
+            <CardDescription className="text-xs font-medium">
+              ภาษีขายสะสม (Output VAT 7%)
+            </CardDescription>
             <CardTitle className="text-xl sm:text-2xl font-extrabold text-indigo-600 dark:text-indigo-400 font-mono">
               ฿{metrics.totalVatCollected.toLocaleString("th-TH", { minimumFractionDigits: 2 })}
             </CardTitle>
@@ -357,7 +367,8 @@ function DocumentsPage() {
           <CardHeader className="pb-2">
             <CardDescription className="text-xs font-medium">ใบเสนอราคารออนุมัติ</CardDescription>
             <CardTitle className="text-xl sm:text-2xl font-extrabold text-sky-600 dark:text-sky-400 font-mono">
-              {metrics.quotationPending} <span className="text-sm font-normal text-muted-foreground">ฉบับ</span>
+              {metrics.quotationPending}{" "}
+              <span className="text-sm font-normal text-muted-foreground">ฉบับ</span>
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -445,10 +456,7 @@ function DocumentsPage() {
                     </tr>
                   ) : (
                     filteredDocuments.map((doc) => (
-                      <tr
-                        key={doc.id}
-                        className="hover:bg-muted/30 transition-colors group"
-                      >
+                      <tr key={doc.id} className="hover:bg-muted/30 transition-colors group">
                         {/* Doc Number & Ref */}
                         <td className="py-3 px-4">
                           <div className="font-mono font-bold text-foreground text-xs flex items-center gap-1.5">
@@ -485,21 +493,21 @@ function DocumentsPage() {
                         {/* Grand Total */}
                         <td className="py-3 px-4 text-right">
                           <div className="font-mono font-bold text-foreground text-sm">
-                            ฿{doc.calculation.grandTotal.toLocaleString("th-TH", {
+                            ฿
+                            {doc.calculation.grandTotal.toLocaleString("th-TH", {
                               minimumFractionDigits: 2,
                             })}
                           </div>
                           <div className="text-[10px] text-muted-foreground">
-                            VAT: ฿{doc.calculation.vatAmount.toLocaleString("th-TH", {
+                            VAT: ฿
+                            {doc.calculation.vatAmount.toLocaleString("th-TH", {
                               minimumFractionDigits: 2,
                             })}
                           </div>
                         </td>
 
                         {/* Status */}
-                        <td className="py-3 px-4 text-center">
-                          {getStatusBadge(doc.status)}
-                        </td>
+                        <td className="py-3 px-4 text-center">{getStatusBadge(doc.status)}</td>
 
                         {/* Actions */}
                         <td className="py-3 px-4 text-right">
@@ -516,11 +524,7 @@ function DocumentsPage() {
 
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
-                                <Button
-                                  size="icon"
-                                  variant="ghost"
-                                  className="size-8 rounded-lg"
-                                >
+                                <Button size="icon" variant="ghost" className="size-8 rounded-lg">
                                   <MoreHorizontal className="size-4" />
                                 </Button>
                               </DropdownMenuTrigger>
@@ -609,12 +613,7 @@ function DocumentsPage() {
       )}
 
       {/* A4 Printable Document Preview */}
-      {previewDoc && (
-        <DocumentA4Print
-          document={previewDoc}
-          onClose={() => setPreviewDoc(null)}
-        />
-      )}
+      {previewDoc && <DocumentA4Print document={previewDoc} onClose={() => setPreviewDoc(null)} />}
     </div>
   );
 }

@@ -291,13 +291,7 @@ function PosAndIssuePage() {
       total: Math.max(0, c.quantity * c.unitPrice - c.discountAmount),
     }));
 
-    return calculateDocument(
-      docItems,
-      vatType,
-      vatRate,
-      overallDiscount,
-      withholdingTaxRate,
-    );
+    return calculateDocument(docItems, vatType, vatRate, overallDiscount, withholdingTaxRate);
   }, [cart, vatType, vatRate, overallDiscount, withholdingTaxRate]);
 
   // Set default cash received whenever grandTotal changes
@@ -371,7 +365,10 @@ function PosAndIssuePage() {
       calculation,
       paymentMethod,
       paymentDate: issueDate,
-      paymentRef: paymentMethod === "CASH" ? `รับเงินสด ฿${cashReceived.toFixed(2)} ทอน ฿${changeAmount.toFixed(2)}` : "PromptPay/Transfer",
+      paymentRef:
+        paymentMethod === "CASH"
+          ? `รับเงินสด ฿${cashReceived.toFixed(2)} ทอน ฿${changeAmount.toFixed(2)}`
+          : "PromptPay/Transfer",
       salesPerson: "แคชเชียร์หน้าร้าน",
       notes: "ขายสินค้าผ่านจุดขาย POS สแกนบาร์โค้ด",
     });
@@ -459,10 +456,14 @@ function PosAndIssuePage() {
                     <ScanLine className="size-4 text-primary" /> สแกนบาร์โค้ดเพื่อขายทันที
                   </CardTitle>
                   <Badge
-                    variant={scanStatus === "scanning" || scanStatus === "starting" ? "default" : "outline"}
+                    variant={
+                      scanStatus === "scanning" || scanStatus === "starting" ? "default" : "outline"
+                    }
                     className="text-[11px]"
                   >
-                    {scanStatus === "scanning" || scanStatus === "starting" ? "กล้องเปิด" : "กล้องปิด"}
+                    {scanStatus === "scanning" || scanStatus === "starting"
+                      ? "กล้องเปิด"
+                      : "กล้องปิด"}
                   </Badge>
                 </CardHeader>
                 <CardContent className="p-4 space-y-3">
@@ -512,7 +513,11 @@ function PosAndIssuePage() {
                             className="h-10 px-3 rounded-xl font-semibold"
                             onClick={() => void toggleTorch()}
                           >
-                            {isTorchOn ? <FlashlightOff className="size-4" /> : <Flashlight className="size-4" />}
+                            {isTorchOn ? (
+                              <FlashlightOff className="size-4" />
+                            ) : (
+                              <Flashlight className="size-4" />
+                            )}
                           </Button>
                         )}
                       </>
@@ -546,7 +551,12 @@ function PosAndIssuePage() {
                         className="pl-9 h-9 text-xs font-mono rounded-xl"
                       />
                     </div>
-                    <Button type="submit" size="sm" variant="secondary" className="h-9 px-4 rounded-xl font-semibold">
+                    <Button
+                      type="submit"
+                      size="sm"
+                      variant="secondary"
+                      className="h-9 px-4 rounded-xl font-semibold"
+                    >
                       ค้นหา
                     </Button>
                   </form>
@@ -582,9 +592,7 @@ function PosAndIssuePage() {
                           <span className="font-mono font-bold text-emerald-600">
                             ฿{p.sellPrice.toFixed(2)}
                           </span>
-                          <span className="text-muted-foreground text-[10px]">
-                            เหลือ {p.stock}
-                          </span>
+                          <span className="text-muted-foreground text-[10px]">เหลือ {p.stock}</span>
                         </div>
                       </button>
                     ))}
@@ -667,7 +675,13 @@ function PosAndIssuePage() {
                                   <div className="text-[10px] font-mono text-muted-foreground flex items-center gap-1.5">
                                     <span>{item.barcode}</span>
                                     <span>•</span>
-                                    <span className={item.stock <= 0 ? "text-destructive font-bold" : "text-muted-foreground"}>
+                                    <span
+                                      className={
+                                        item.stock <= 0
+                                          ? "text-destructive font-bold"
+                                          : "text-muted-foreground"
+                                      }
+                                    >
                                       สต็อก: {item.stock} {item.unit}
                                     </span>
                                   </div>
@@ -680,7 +694,9 @@ function PosAndIssuePage() {
                                       variant="outline"
                                       size="icon"
                                       className="size-6 rounded-md"
-                                      onClick={() => handleUpdateQty(item.productId, item.quantity - 1)}
+                                      onClick={() =>
+                                        handleUpdateQty(item.productId, item.quantity - 1)
+                                      }
                                     >
                                       -
                                     </Button>
@@ -697,7 +713,9 @@ function PosAndIssuePage() {
                                       variant="outline"
                                       size="icon"
                                       className="size-6 rounded-md"
-                                      onClick={() => handleUpdateQty(item.productId, item.quantity + 1)}
+                                      onClick={() =>
+                                        handleUpdateQty(item.productId, item.quantity + 1)
+                                      }
                                     >
                                       +
                                     </Button>
@@ -712,7 +730,10 @@ function PosAndIssuePage() {
                                     className="h-7 w-20 text-right font-mono text-xs rounded-md inline-block"
                                     value={item.unitPrice}
                                     onChange={(e) =>
-                                      handleUpdateUnitPrice(item.productId, Number(e.target.value) || 0)
+                                      handleUpdateUnitPrice(
+                                        item.productId,
+                                        Number(e.target.value) || 0,
+                                      )
                                     }
                                   />
                                 </TableCell>
@@ -778,10 +799,7 @@ function PosAndIssuePage() {
                       {/* VAT Option */}
                       <div className="space-y-1">
                         <Label className="text-xs font-semibold">ภาษีมูลค่าเพิ่ม (VAT 7%)</Label>
-                        <Select
-                          value={vatType}
-                          onValueChange={(val) => setVatType(val as VatType)}
-                        >
+                        <Select value={vatType} onValueChange={(val) => setVatType(val as VatType)}>
                           <SelectTrigger className="h-9 rounded-xl text-xs">
                             <SelectValue />
                           </SelectTrigger>
@@ -823,7 +841,9 @@ function PosAndIssuePage() {
                       {calculation.discountTotal > 0 && (
                         <div className="flex justify-between text-destructive">
                           <span>ส่วนลดรวมทั้งสิ้น:</span>
-                          <span className="font-mono">-฿{calculation.discountTotal.toFixed(2)}</span>
+                          <span className="font-mono">
+                            -฿{calculation.discountTotal.toFixed(2)}
+                          </span>
                         </div>
                       )}
 
@@ -844,7 +864,9 @@ function PosAndIssuePage() {
                       {calculation.withholdingTaxAmount > 0 && (
                         <div className="flex justify-between text-amber-600">
                           <span>ภาษีหัก ณ ที่จ่าย ({withholdingTaxRate}%):</span>
-                          <span className="font-mono">-฿{calculation.withholdingTaxAmount.toFixed(2)}</span>
+                          <span className="font-mono">
+                            -฿{calculation.withholdingTaxAmount.toFixed(2)}
+                          </span>
                         </div>
                       )}
 
@@ -859,7 +881,10 @@ function PosAndIssuePage() {
                           </div>
                         </div>
                         <span className="text-2xl font-mono font-bold text-emerald-600">
-                          ฿{calculation.grandTotal.toLocaleString("th-TH", { minimumFractionDigits: 2 })}
+                          ฿
+                          {calculation.grandTotal.toLocaleString("th-TH", {
+                            minimumFractionDigits: 2,
+                          })}
                         </span>
                       </div>
                     </div>
@@ -940,7 +965,9 @@ function PosAndIssuePage() {
                       {paymentMethod === "CASH" && (
                         <div className="space-y-1.5 pt-1">
                           <div className="flex items-center justify-between text-xs">
-                            <span className="text-muted-foreground font-medium">รับเงินสดมา (บาท):</span>
+                            <span className="text-muted-foreground font-medium">
+                              รับเงินสดมา (บาท):
+                            </span>
                             <Input
                               type="number"
                               min="0"
@@ -953,22 +980,18 @@ function PosAndIssuePage() {
                           {/* Quick Cash Presets */}
                           <div className="flex items-center gap-1 flex-wrap pt-0.5">
                             <span className="text-[10px] text-muted-foreground">ลัด:</span>
-                            {[
-                              Math.ceil(calculation.grandTotal),
-                              50,
-                              100,
-                              500,
-                              1000,
-                            ].map((amt, idx) => (
-                              <button
-                                key={idx}
-                                type="button"
-                                className="px-1.5 py-0.5 rounded border text-[10px] font-mono hover:bg-muted font-medium"
-                                onClick={() => setCashReceived(amt)}
-                              >
-                                {idx === 0 ? "พอดี" : `฿${amt}`}
-                              </button>
-                            ))}
+                            {[Math.ceil(calculation.grandTotal), 50, 100, 500, 1000].map(
+                              (amt, idx) => (
+                                <button
+                                  key={idx}
+                                  type="button"
+                                  className="px-1.5 py-0.5 rounded border text-[10px] font-mono hover:bg-muted font-medium"
+                                  onClick={() => setCashReceived(amt)}
+                                >
+                                  {idx === 0 ? "พอดี" : `฿${amt}`}
+                                </button>
+                              ),
+                            )}
                           </div>
 
                           {/* Change Display */}
@@ -992,8 +1015,8 @@ function PosAndIssuePage() {
                     className="w-full h-12 rounded-xl text-base font-bold gap-2 bg-emerald-600 hover:bg-emerald-700 text-white shadow-md active:scale-98 transition-all"
                     onClick={handleCompleteSale}
                   >
-                    <CheckCircle2 className="size-5" /> ชำระเงิน & ออกใบเสร็จ (
-                    ฿{calculation.grandTotal.toLocaleString("th-TH", { minimumFractionDigits: 2 })})
+                    <CheckCircle2 className="size-5" /> ชำระเงิน & ออกใบเสร็จ ( ฿
+                    {calculation.grandTotal.toLocaleString("th-TH", { minimumFractionDigits: 2 })})
                   </Button>
                 </CardContent>
               </Card>
@@ -1006,7 +1029,8 @@ function PosAndIssuePage() {
           <Card className="rounded-2xl border-border/80 shadow-sm max-w-2xl mx-auto">
             <CardHeader className="p-4 pb-2">
               <CardTitle className="text-base flex items-center gap-2">
-                <MinusCircle className="size-5 text-destructive" /> เบิกจ่ายสินค้าออกจากสต็อก (Stock Issue)
+                <MinusCircle className="size-5 text-destructive" /> เบิกจ่ายสินค้าออกจากสต็อก (Stock
+                Issue)
               </CardTitle>
               <CardDescription className="text-xs">
                 บันทึกการตัดยอดสต็อกสำหรับการใช้งานภายในร้าน, สินค้าหมดอายุ, ชำรุด หรือสูญหาย
@@ -1058,7 +1082,9 @@ function PosAndIssuePage() {
                   >
                     <option value="สินค้าเสียหาย / ชำรุด">สินค้าเสียหาย / ชำรุด</option>
                     <option value="สินค้าหมดอายุ (Expired)">สินค้าหมดอายุ (Expired)</option>
-                    <option value="เบิกใช้งานภายในร้าน/สำนักงาน">เบิกใช้งานภายในร้าน/สำนักงาน</option>
+                    <option value="เบิกใช้งานภายในร้าน/สำนักงาน">
+                      เบิกใช้งานภายในร้าน/สำนักงาน
+                    </option>
                     <option value="สินค้าตัวอย่าง/ทดลองชิม">สินค้าตัวอย่าง/ทดลองชิม</option>
                     <option value="สูญหาย/ตรวจนับไม่ตรง">สูญหาย/ตรวจนับไม่ตรง</option>
                   </select>
@@ -1091,7 +1117,8 @@ function PosAndIssuePage() {
                 </Badge>
               </div>
               <DialogDescription className="text-xs">
-                ตัดยอดสต็อกเรียบร้อยแล้ว สามารถพิมพ์สลิปความร้อน (58mm/80mm) หรือพิมพ์เอกสารใบกำกับภาษี A4
+                ตัดยอดสต็อกเรียบร้อยแล้ว สามารถพิมพ์สลิปความร้อน (58mm/80mm)
+                หรือพิมพ์เอกสารใบกำกับภาษี A4
               </DialogDescription>
             </DialogHeader>
 

@@ -157,7 +157,9 @@ export function useBarcodeScanner(
     if (!track) return;
 
     try {
-      const capabilities = track.getCapabilities ? (track.getCapabilities() as { torch?: boolean }) : {};
+      const capabilities = track.getCapabilities
+        ? (track.getCapabilities() as { torch?: boolean })
+        : {};
       if (capabilities.torch) {
         const nextTorch = !isTorchOn;
         // @ts-expect-error torch constraint
@@ -277,7 +279,10 @@ export function useBarcodeScanner(
             loopTimerRef.current = window.requestAnimationFrame(scanNativeLoop);
             return;
           } catch (nativeInitErr) {
-            console.warn("Native BarcodeDetector failed, falling back to ZXing Turbo", nativeInitErr);
+            console.warn(
+              "Native BarcodeDetector failed, falling back to ZXing Turbo",
+              nativeInitErr,
+            );
           }
         }
 
