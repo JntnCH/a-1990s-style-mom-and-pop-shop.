@@ -172,6 +172,26 @@ export const DEFAULT_FOLLOWERS: LineUserFollower[] = [
     lastInteractionAt: "2026-09-24 16:40 น.",
     role: "staff",
   },
+  {
+    userId: "U77b8899aabbccdde1",
+    displayName: "ซัพพลายเออร์ A (Supplier Central)",
+    pictureUrl:
+      "https://images.unsplash.com/photo-1560250097-0b93528c311a?w=120&auto=format&fit=crop&q=80",
+    statusMessage: "ตัวแทนจำหน่ายสินค้าอุปโภคบริโภค",
+    followedAt: "2026-09-22 11:20 น.",
+    lastInteractionAt: "2026-09-26 14:10 น.",
+    role: "staff",
+  },
+  {
+    userId: "C112233445566778899",
+    displayName: "กลุ่มไลน์สั่งซื้อสินค้า (PO Store Group)",
+    pictureUrl:
+      "https://images.unsplash.com/photo-1522071820081-009f0129c71c?w=120&auto=format&fit=crop&q=80",
+    statusMessage: "กลุ่มแชทไลน์สำหรับรับใบสั่งซื้อหน้าร้าน",
+    followedAt: "2026-09-23 09:00 น.",
+    lastInteractionAt: "2026-09-27 10:00 น.",
+    role: "viewer",
+  },
 ];
 
 export const DEFAULT_MOVEMENTS: StockMovementLog[] = [

@@ -83,7 +83,7 @@ jobs:
           service: "${{ env.SERVICE_NAME }}"
           image: "${{ env.GAR_LOCATION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}"
           region: "${{ env.REGION }}"
-          flags: "--allow-unauthenticated --port=8080 --cpu=1 --memory=512Mi --min-instances=0 --max-instances=2"
+          flags: "--allow-unauthenticated --port=8080 --cpu=1 --memory=512Mi --min-instances=1 --max-instances=2"
 
       # Explicitly grant public unauthenticated access (allUsers)
       - name: "Ensure Public Access (allUsers)"

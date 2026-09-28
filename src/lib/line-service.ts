@@ -11,6 +11,7 @@ import {
   createStockAlertFlexBubble,
   type FlexStockAlertItem,
 } from "./flex-templates";
+import { sendLineMessagingApiFn } from "./line-server-fn";
 
 export interface LineOrderItem {
   product: ProductItem;
@@ -177,15 +178,152 @@ export function buildOrderPlainText(
 
 export type LineShareTarget = "group" | "personal";
 
+export interface ThreeTierSendOptions {
+  summary: string;
+  flexMessage?: unknown;
+  target?: LineShareTarget;
+  toUserIdOrGroupId?: string;
+  isBroadcast?: boolean;
+}
+
 export interface LineShareResult {
   success: boolean;
-  channel: "liff_picker" | "liff_send" | "line_intent";
+  channel: "server_api" | "liff_picker" | "liff_send" | "line_intent";
+  tier: 1 | 2 | 3;
   message: string;
+  fallbackReason?: string | undefined;
 }
 
 /**
- * Dispatches the order to LINE either via LIFF Target Picker (Group / Personal)
- * or via standard LINE Share Intent when running outside LIFF.
+ * 3-Tier Fallback Dispatcher for LINE Messaging:
+ * Tier 1: Server LINE Messaging API (Push/Broadcast via Bot)
+ * Tier 2: LINE LIFF shareTargetPicker / in-client send
+ * Tier 3: Web Share Intent (https://line.me/R/share)
+ */
+export async function sendWith3TierFallback(
+  options: ThreeTierSendOptions,
+): Promise<LineShareResult> {
+  const { summary, flexMessage, target = "group", toUserIdOrGroupId, isBroadcast } = options;
+  let tier1ErrorReason = "";
+
+  // ─────────────────────────────────────────────────────────────
+  // Tier 1: Server LINE Messaging API
+  // ─────────────────────────────────────────────────────────────
+  try {
+    const serverRes = await sendLineMessagingApiFn({
+      data: {
+        orderSummary: summary,
+        flexMessage,
+        toUserIdOrGroupId,
+        isBroadcast,
+      },
+    });
+
+    if (serverRes.success) {
+      return {
+        success: true,
+        channel: "server_api",
+        tier: 1,
+        message: "ส่งข้อความผ่าน Server LINE Messaging API สำเร็จ (Tier 1)",
+      };
+    } else {
+      tier1ErrorReason = serverRes.error || "Server LINE Messaging API ไม่พร้อมใช้งาน";
+      console.warn(
+        `[3-Tier Fallback] Tier 1 (Server API) unavailable: ${tier1ErrorReason}. Cascading to Tier 2 (LIFF)...`,
+      );
+    }
+  } catch (err: unknown) {
+    tier1ErrorReason = err instanceof Error ? err.message : String(err);
+    console.warn(
+      `[3-Tier Fallback] Tier 1 error: ${tier1ErrorReason}. Cascading to Tier 2 (LIFF)...`,
+    );
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // Tier 2: LINE LIFF shareTargetPicker / In-client Send
+  // ─────────────────────────────────────────────────────────────
+  const liffId = getClientLiffId();
+  if (liffId && typeof window !== "undefined") {
+    try {
+      const initialized = await initLiff();
+      if (initialized && liffInstance) {
+        const messagePayload = flexMessage || { type: "text", text: summary };
+
+        // 2a. shareTargetPicker (allows choosing LINE group or chat room)
+        if (liffInstance.isApiAvailable("shareTargetPicker")) {
+          try {
+            const pickerRes = await liffInstance.shareTargetPicker([messagePayload]);
+            if (pickerRes) {
+              return {
+                success: true,
+                channel: "liff_picker",
+                tier: 2,
+                message: `ส่งเข้า LINE (${target === "group" ? "กลุ่ม" : "ส่วนตัว"}) ผ่าน LIFF Target Picker สำเร็จ (Tier 2)`,
+                fallbackReason: tier1ErrorReason,
+              };
+            }
+            return {
+              success: false,
+              channel: "liff_picker",
+              tier: 2,
+              message: "ผู้ใช้ยกเลิกการเลือกห้องแชทใน LINE",
+              fallbackReason: tier1ErrorReason,
+            };
+          } catch (pickerErr) {
+            console.warn(
+              "[3-Tier Fallback] Tier 2 shareTargetPicker error, trying in-client send:",
+              pickerErr,
+            );
+          }
+        }
+
+        // 2b. In-client direct chat send
+        if (liffInstance.isInClient()) {
+          try {
+            await liffInstance.sendMessages([messagePayload]);
+            return {
+              success: true,
+              channel: "liff_send",
+              tier: 2,
+              message: "ส่งข้อความ Flex Message เข้าแชท LINE ผ่าน LIFF สำเร็จ (Tier 2)",
+              fallbackReason: tier1ErrorReason,
+            };
+          } catch (sendErr) {
+            console.warn("[3-Tier Fallback] Tier 2 sendMessages error:", sendErr);
+          }
+        }
+      }
+    } catch (liffErr) {
+      console.warn("[3-Tier Fallback] Tier 2 initialization error:", liffErr);
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // Tier 3: Web Share Intent (https://line.me/R/share)
+  // ─────────────────────────────────────────────────────────────
+  const lineIntentUrl = `https://line.me/R/share?text=${encodeURIComponent(summary)}`;
+  if (typeof window !== "undefined") {
+    const link = document.createElement("a");
+    link.href = lineIntentUrl;
+    link.target = "_blank";
+    link.rel = "noopener noreferrer";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }
+
+  return {
+    success: true,
+    channel: "line_intent",
+    tier: 3,
+    message: `เปิดหน้าแชร์ LINE (Web Share Intent) สำเร็จ (Tier 3 Fallback)`,
+    fallbackReason: tier1ErrorReason,
+  };
+}
+
+/**
+ * Dispatches the order to LINE utilizing the 3-Tier Fallback Architecture:
+ * 1. Server Messaging API -> 2. LIFF Target Picker -> 3. Web Share Intent
  */
 export async function sendOrderToLine(
   orders: LineOrderItem[],
@@ -199,67 +337,11 @@ export async function sendOrderToLine(
   );
   const plain = buildOrderPlainText(orders, storeName);
 
-  const liffId = getClientLiffId();
-
-  if (liffId) {
-    const initialized = await initLiff();
-    if (initialized && liffInstance) {
-      // If inside LINE LIFF with shareTargetPicker capability
-      if (liffInstance.isApiAvailable("shareTargetPicker")) {
-        try {
-          const res = await liffInstance.shareTargetPicker([flex]);
-          if (res) {
-            return {
-              success: true,
-              channel: "liff_picker",
-              message:
-                target === "group" ? "ส่งเข้า LINE กลุ่มสำเร็จ" : "ส่งเข้า LINE ส่วนตัวสำเร็จ",
-            };
-          }
-          return {
-            success: false,
-            channel: "liff_picker",
-            message: "ผู้ใช้ยกเลิกการเลือกแชท LINE",
-          };
-        } catch (pickerErr) {
-          console.warn("LIFF shareTargetPicker error:", pickerErr);
-        }
-      }
-
-      // If already in client chat and can send messages directly
-      if (liffInstance.isInClient()) {
-        try {
-          await liffInstance.sendMessages([flex]);
-          return {
-            success: true,
-            channel: "liff_send",
-            message: "ส่งข้อความ Flex Message เข้าแชท LINE เรียบร้อยแล้ว",
-          };
-        } catch (sendErr) {
-          console.warn("LIFF sendMessages error:", sendErr);
-        }
-      }
-    }
-  }
-
-  // Fallback: Open LINE Share Intent URL (works on all web browsers & mobile)
-  const lineIntentUrl = `https://line.me/R/share?text=${encodeURIComponent(plain)}`;
-  if (typeof window !== "undefined") {
-    // In iframe or web environment, open share intent
-    const link = document.createElement("a");
-    link.href = lineIntentUrl;
-    link.target = "_blank";
-    link.rel = "noopener noreferrer";
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  }
-
-  return {
-    success: true,
-    channel: "line_intent",
-    message: `เปิดหน้าแชร์ LINE สำหรับส่งเข้า${target === "group" ? "กลุ่ม" : "ส่วนตัว"}เรียบร้อย`,
-  };
+  return sendWith3TierFallback({
+    summary: plain,
+    flexMessage: flex,
+    target,
+  });
 }
 
 export interface OrderFlexItem {
@@ -359,23 +441,9 @@ export async function sendStockAlertToLine(
   alertItems: FlexStockAlertItem[],
   target: LineShareTarget = "group",
   storeName: string = "ร้าน MiniMark",
-): Promise<{ success: boolean; method?: string; error?: string }> {
-  const isAvailable = await initLiff();
+): Promise<{ success: boolean; method?: string; error?: string; tier?: number }> {
   const flexMsg = createStockAlertFlexBubble(alertItems, { storeName });
 
-  if (isAvailable && liffInstance?.isApiAvailable("shareTargetPicker")) {
-    try {
-      const res = await liffInstance.shareTargetPicker([flexMsg]);
-      if (res) {
-        return { success: true, method: "share_target_picker" };
-      }
-      return { success: false, error: "ผู้ใช้ยกเลิกการแชร์" };
-    } catch (e: unknown) {
-      console.warn("ShareTargetPicker failed, falling back to intent", e);
-    }
-  }
-
-  // Fallback to text intent
   let text = `⚠️ แจ้งเตือนสต็อกสินค้าต้องสั่งซื้อ — ${storeName}\n`;
   text += `────────────────────\n`;
   alertItems.forEach((item, index) => {
@@ -385,18 +453,16 @@ export async function sendStockAlertToLine(
   });
   text += `────────────────────\nกรุณาเข้าสู่ระบบ MiniMark เพื่อตรวจสอบสต็อก`;
 
-  const encoded = encodeURIComponent(text);
-  const url = `https://line.me/R/msg/text/?${encoded}`;
+  const res = await sendWith3TierFallback({
+    summary: text,
+    flexMessage: flexMsg,
+    target,
+  });
 
-  if (typeof window !== "undefined") {
-    const link = document.createElement("a");
-    link.href = url;
-    link.target = "_blank";
-    link.rel = "noopener noreferrer";
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  }
-
-  return { success: true, method: "web_intent" };
+  return {
+    success: res.success,
+    method: res.channel,
+    tier: res.tier,
+    error: res.success ? undefined : res.message,
+  };
 }
