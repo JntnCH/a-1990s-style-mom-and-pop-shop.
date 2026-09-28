@@ -118,15 +118,27 @@ const globalServerDatabase: {
 };
 
 export const getLineServerConfigFn = createServerFn({ method: "GET" }).handler(async () => {
-  const envLiff = (process.env["LINE_LIFF_ID"] || process.env["VITE_LINE_LIFF_ID"] || "").trim();
+  const envLiff = (
+    process.env["LINE_LIFF_ID"] ||
+    process.env["VITE_LINE_LIFF_ID"] ||
+    process.env["LIFF_ID"] ||
+    ""
+  ).trim();
   const validLiff = envLiff && envLiff !== "xxxxx-xxxxx" ? envLiff : undefined;
 
+  const hasAccessToken = Boolean(
+    process.env["LINE_CHANNEL_ACCESS_TOKEN"] ||
+    process.env["LINE_ACCESS_TOKEN"] ||
+    process.env["LINE_TOKEN"],
+  );
+
   return {
-    hasChannelId: Boolean(process.env["LINE_CHANNEL_ID"]),
-    hasChannelSecret: Boolean(process.env["LINE_CHANNEL_SECRET"]),
-    hasAccessToken: Boolean(process.env["LINE_CHANNEL_ACCESS_TOKEN"]),
+    hasChannelId: Boolean(process.env["LINE_CHANNEL_ID"] || process.env["CHANNEL_ID"]),
+    hasChannelSecret: Boolean(process.env["LINE_CHANNEL_SECRET"] || process.env["CHANNEL_SECRET"]),
+    hasAccessToken,
     hasServerLiffId: Boolean(validLiff),
     configuredLiffId: validLiff,
+    hasLineToId: Boolean(process.env["LINE_TO_ID"] || process.env["LINE_TARGET_ID"]),
   };
 });
 
@@ -337,19 +349,24 @@ export async function callLineMessagingApiWithRetry(
 export const sendLineMessagingApiFn = createServerFn({ method: "POST" })
   .validator((data: SendLineOrderPayload) => data)
   .handler(async ({ data }) => {
-    const token = (process.env["LINE_CHANNEL_ACCESS_TOKEN"] || data.channelAccessToken)?.trim();
+    const token = (
+      process.env["LINE_CHANNEL_ACCESS_TOKEN"] ||
+      process.env["LINE_ACCESS_TOKEN"] ||
+      process.env["LINE_TOKEN"] ||
+      data.channelAccessToken
+    )?.trim();
 
     if (!token) {
       return {
         success: false,
         configured: false,
         error:
-          "ยังไม่ได้ตั้งค่า LINE_CHANNEL_ACCESS_TOKEN (กรุณาระบุ Channel Access Token ในช่องตั้งค่า หรือบนเซิร์ฟเวอร์ เพื่อส่ง Flex Message)",
+          "ยังไม่ได้ตั้งค่า LINE_CHANNEL_ACCESS_TOKEN (กรุณาระบุ Channel Access Token ในช่องตั้งค่า หรือตั้งใน GitHub Secrets / Cloud Run เพื่อส่ง Flex Message)",
       };
     }
 
     const isBroadcast = Boolean(data.isBroadcast);
-    const configuredTargets = (process.env["LINE_TO_ID"] || "")
+    const configuredTargets = (process.env["LINE_TO_ID"] || process.env["LINE_TARGET_ID"] || "")
       .split(",")
       .map((value) => value.trim())
       .filter(Boolean);

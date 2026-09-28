@@ -36,7 +36,10 @@ export function getClientLiffId(): string | null {
   if (local && local.trim() && local.trim() !== "xxxxx-xxxxx") {
     return local.trim();
   }
-  const id = import.meta.env["VITE_LINE_LIFF_ID"];
+  const id =
+    import.meta.env["VITE_LINE_LIFF_ID"] ||
+    import.meta.env["LINE_LIFF_ID"] ||
+    import.meta.env["VITE_LIFF_ID"];
   if (id && typeof id === "string" && id.trim() !== "" && id.trim() !== "xxxxx-xxxxx") {
     return id.trim();
   }

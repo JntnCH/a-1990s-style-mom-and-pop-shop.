@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import {
   AlertCircle,
   AlertTriangle,
+  ArrowLeft,
   ArrowRight,
   Bell,
   Calculator,
@@ -43,12 +44,14 @@ import {
   User,
   Users,
   Wallet,
+  X,
   XCircle,
 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 
 import { PageHeader } from "@/components/layout/PageHeader";
+import { cn } from "@/lib/utils";
 import {
   CategorySelect,
   FormatBadge,
@@ -219,6 +222,20 @@ function ReorderPage() {
     "PURCHASE_ORDER",
   );
 
+  // Lock body scroll on mobile and desktop when recipient selection modal is open
+  useEffect(() => {
+    if (pushModalOpen) {
+      const originalOverflow = document.body.style.overflow;
+      const originalTouchAction = document.body.style.touchAction;
+      document.body.style.overflow = "hidden";
+      document.body.style.touchAction = "none";
+      return () => {
+        document.body.style.overflow = originalOverflow;
+        document.body.style.touchAction = originalTouchAction;
+      };
+    }
+  }, [pushModalOpen]);
+
   // Flex Preview Visualizer Modal
   const [flexPreviewOpen, setFlexPreviewOpen] = useState(false);
   const [flexPreviewData, setFlexPreviewData] = useState<unknown>(null);
@@ -276,7 +293,13 @@ function ReorderPage() {
     reloadData();
     getLineStatus().then(setLineStatus);
     getLineServerConfigFn()
-      .then(setServerConfig)
+      .then((cfg) => {
+        setServerConfig(cfg);
+        if (cfg?.configuredLiffId) {
+          setClientLiffId(cfg.configuredLiffId);
+          setLiffIdInputValue(cfg.configuredLiffId);
+        }
+      })
       .catch(() => setServerConfig(null));
 
     const onStoreChange = () => reloadData();
@@ -2622,27 +2645,195 @@ function ReorderPage() {
         </DialogContent>
       </Dialog>
 
-      {/* SERVER MESSAGING API & LINE FRIEND RECIPIENT DIALOG (REAL FLEX MESSAGE) */}
+      {/* SERVER MESSAGING API & LINE FRIEND RECIPIENT MODAL (MOBILE FULL-SCREEN PANEL / DESKTOP DIALOG) */}
       <Dialog open={pushModalOpen} onOpenChange={setPushModalOpen}>
-        <DialogContent className="w-[96vw] max-w-2xl rounded-2xl p-4 sm:p-6 max-h-[92vh] overflow-y-auto">
-          <DialogHeader className="pb-2 border-b">
-            <div className="flex items-center justify-between gap-2 flex-wrap">
-              <DialogTitle className="text-base sm:text-lg flex items-center gap-2 text-foreground font-bold">
-                <MessageCircle className="size-5 sm:size-6 text-[#06C755]" />
-                เลือกรายชื่อเพื่อน / ผู้รับเพื่อส่ง LINE Flex Message
-              </DialogTitle>
-              <Badge className="bg-[#06C755] hover:bg-[#05b34c] text-white text-[11px] font-bold px-2 py-0.5">
-                ⚡ LINE Flex Message แท้
-              </Badge>
-            </div>
-            <DialogDescription className="text-xs text-muted-foreground mt-1">
-              {pushMessageType === "STOCK_ALERT"
-                ? `เลือกเพื่อน ซัพพลายเออร์ หรือกลุ่มไลน์ เพื่อส่งแจ้งเตือนสต็อกสินค้าต้องสั่งซื้อ (${allReorderNeeded.length} รายการ)`
-                : `เลือกเพื่อน ซัพพลายเออร์ หรือกลุ่มไลน์ เพื่อส่งใบสั่งซื้อสินค้า (${fullItems.length} รายการ, รวม ฿${totalCost.toLocaleString()}) ในรูปแบบ Flex Message`}
-            </DialogDescription>
-          </DialogHeader>
+        <DialogContent
+          className={cn(
+            // Mobile: Full-Screen Panel taking 100% of viewport, single unified scroll, zero outer margins
+            "fixed inset-0 z-50 flex flex-col w-full h-[100dvh] max-w-none p-0 gap-0 rounded-none border-0 bg-background overflow-hidden top-0 left-0 translate-x-0 translate-y-0 shadow-none duration-200",
+            // Desktop: Centered floating Dialog with rounded corners
+            "md:inset-auto md:top-1/2 md:left-1/2 md:-translate-x-1/2 md:-translate-y-1/2 md:w-[94vw] md:max-w-2xl md:h-[88vh] md:max-h-[850px] md:rounded-2xl md:border md:shadow-2xl",
+            // Hide default floating close button on mobile so it doesn't overlap header
+            "[&>button.absolute]:hidden md:[&>button.absolute]:flex",
+          )}
+        >
+          {/* STICKY TOP HEADER: Back button, Title, Search Box, Horizontal Filter Tabs */}
+          <div className="shrink-0 border-b bg-background/95 backdrop-blur-md z-20">
+            {/* Top Navigation Row */}
+            <div className="flex items-center justify-between gap-2 px-3 sm:px-4 pt-3 pb-2">
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => setPushModalOpen(false)}
+                className="h-9 px-2.5 text-xs font-semibold gap-1.5 text-foreground hover:bg-muted active:scale-95 rounded-xl shrink-0 -ml-1"
+              >
+                <ArrowLeft className="size-4" />
+                <span>กลับ</span>
+              </Button>
 
-          <div className="space-y-4 py-2">
+              <div className="flex items-center gap-2 min-w-0 flex-1 justify-center sm:justify-start">
+                <div className="size-7 rounded-lg bg-[#06C755]/15 flex items-center justify-center shrink-0">
+                  <MessageCircle className="size-4 text-[#06C755]" />
+                </div>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-1.5">
+                    <DialogTitle className="text-sm sm:text-base font-bold text-foreground truncate">
+                      เลือกผู้รับ
+                    </DialogTitle>
+                    <Badge className="bg-[#06C755] hover:bg-[#05b34c] text-white text-[10px] font-bold px-1.5 py-0.5 shrink-0">
+                      ⚡ Flex
+                    </Badge>
+                  </div>
+                  <DialogDescription className="text-[11px] text-muted-foreground truncate hidden sm:block">
+                    {pushMessageType === "STOCK_ALERT"
+                      ? `ส่งแจ้งเตือนสต็อก (${allReorderNeeded.length} รายการ)`
+                      : `ส่งใบสั่งซื้อสินค้า (${fullItems.length} รายการ, ฿${totalCost.toLocaleString()})`}
+                  </DialogDescription>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-1 shrink-0">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 px-2 text-xs text-muted-foreground hover:text-foreground rounded-lg gap-1"
+                  onClick={() => {
+                    setLiffIdInputValue(getClientLiffId() || "");
+                    setLiffIdDialogOpen(true);
+                  }}
+                  title="ตั้งค่า LINE LIFF ID"
+                >
+                  <Settings2 className="size-3.5" />
+                  <span className="hidden sm:inline text-[11px]">ตั้งค่า LIFF</span>
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="size-8 text-muted-foreground hover:text-foreground rounded-lg md:hidden"
+                  onClick={() => setPushModalOpen(false)}
+                  title="ปิด"
+                >
+                  <X className="size-4" />
+                </Button>
+              </div>
+            </div>
+
+            {/* Sticky Search Box (Accessibly Placed at Top) */}
+            <div className="px-3 sm:px-4 pt-1 pb-2">
+              <div className="relative">
+                <Search className="size-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+                <Input
+                  placeholder="ค้นหาชื่อเพื่อน, พนักงาน, ซัพพลายเออร์, หรือ User ID..."
+                  className="h-10 pl-9 pr-9 text-base md:text-xs rounded-xl bg-muted/40 border-muted-foreground/20 focus:bg-background transition-all shadow-none"
+                  value={friendSearchQuery}
+                  onChange={(e) => setFriendSearchQuery(e.target.value)}
+                />
+                {friendSearchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setFriendSearchQuery("")}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-muted-foreground hover:text-foreground rounded-full hover:bg-muted"
+                  >
+                    <X className="size-3.5" />
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Horizontal Filter Chips (Swipeable Left-Right on Mobile) */}
+            <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar px-3 sm:px-4 pb-2.5 whitespace-nowrap touch-pan-x [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              <Button
+                type="button"
+                size="sm"
+                variant={recipientFilterTab === "ALL" ? "default" : "outline"}
+                className={`h-7 text-xs rounded-full px-3 font-medium shrink-0 transition-all ${
+                  recipientFilterTab === "ALL"
+                    ? "bg-emerald-600 text-white hover:bg-emerald-700 shadow-2xs"
+                    : "text-muted-foreground hover:text-foreground bg-muted/20"
+                }`}
+                onClick={() => setRecipientFilterTab("ALL")}
+              >
+                ทั้งหมด ({followers.length})
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant={recipientFilterTab === "SUPPLIERS" ? "default" : "outline"}
+                className={`h-7 text-xs rounded-full px-3 font-medium shrink-0 transition-all ${
+                  recipientFilterTab === "SUPPLIERS"
+                    ? "bg-emerald-600 text-white hover:bg-emerald-700 shadow-2xs"
+                    : "text-muted-foreground hover:text-foreground bg-muted/20"
+                }`}
+                onClick={() => setRecipientFilterTab("SUPPLIERS")}
+              >
+                🏢 ซัพพลายเออร์/ร้านส่ง (
+                {
+                  followers.filter(
+                    (f) =>
+                      !f.displayName.includes("กลุ่ม") &&
+                      (f.displayName.includes("ซัพพลายเออร์") ||
+                        f.displayName.includes("ยูนิลีเวอร์") ||
+                        f.displayName.includes("ยี่ปั๊ว") ||
+                        f.displayName.includes("ค้าส่ง") ||
+                        f.displayName.includes("เครื่องดื่ม") ||
+                        (f.role === "staff" && !f.displayName.includes("โกดัง"))),
+                  ).length
+                }
+                )
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant={recipientFilterTab === "GROUPS" ? "default" : "outline"}
+                className={`h-7 text-xs rounded-full px-3 font-medium shrink-0 transition-all ${
+                  recipientFilterTab === "GROUPS"
+                    ? "bg-emerald-600 text-white hover:bg-emerald-700 shadow-2xs"
+                    : "text-muted-foreground hover:text-foreground bg-muted/20"
+                }`}
+                onClick={() => setRecipientFilterTab("GROUPS")}
+              >
+                👥 กลุ่มแชทไลน์ (
+                {
+                  followers.filter(
+                    (f) =>
+                      f.userId.startsWith("C") ||
+                      f.role === "viewer" ||
+                      f.displayName.includes("กลุ่ม"),
+                  ).length
+                }
+                )
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant={recipientFilterTab === "STAFF" ? "default" : "outline"}
+                className={`h-7 text-xs rounded-full px-3 font-medium shrink-0 transition-all ${
+                  recipientFilterTab === "STAFF"
+                    ? "bg-emerald-600 text-white hover:bg-emerald-700 shadow-2xs"
+                    : "text-muted-foreground hover:text-foreground bg-muted/20"
+                }`}
+                onClick={() => setRecipientFilterTab("STAFF")}
+              >
+                👤 ผู้ดูแล/พนักงาน (
+                {
+                  followers.filter(
+                    (f) =>
+                      f.role === "admin" ||
+                      f.displayName.includes("แอดมิน") ||
+                      f.displayName.includes("ผู้ดูแล") ||
+                      f.displayName.includes("พนักงาน"),
+                  ).length
+                }
+                )
+              </Button>
+            </div>
+          </div>
+
+          {/* MAIN UNIFIED SCROLL CONTAINER (SINGLE LAYER SCROLL - NO NESTED SCROLLBARS) */}
+          <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain touch-pan-y p-3.5 sm:p-5 space-y-4">
             {/* OPTION A: NATIVE LINE TARGET PICKER */}
             <div className="p-3.5 rounded-2xl bg-gradient-to-r from-[#06C755]/15 via-[#06C755]/10 to-transparent border border-[#06C755]/30 space-y-2">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -2652,25 +2843,11 @@ function ReorderPage() {
                     เปิดรายชื่อเพื่อนในแอป LINE ทันที (LINE Share Target Picker)
                   </div>
                   <p className="text-[11px] text-muted-foreground">
-                    เปิดหน้าจอเลือกห้องแชทของ LINE เพื่อส่ง Flex Message
+                    เปิดหน้าจอเลือกห้องแชทของแอป LINE เพื่อส่ง Flex Message
                     เข้าห้องแชทเพื่อนหรือกลุ่มที่ต้องการทันที
                   </p>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="h-9 px-2.5 text-xs rounded-xl border-[#06C755]/40 text-[#06C755] hover:bg-[#06C755]/10 font-semibold gap-1"
-                    onClick={() => {
-                      setLiffIdInputValue(getClientLiffId() || "");
-                      setLiffIdDialogOpen(true);
-                    }}
-                    title="ตั้งค่า LINE LIFF ID"
-                  >
-                    <Settings2 className="size-3.5" />
-                    <span className="hidden sm:inline">ตั้งค่า LIFF</span>
-                  </Button>
                   <Button
                     type="button"
                     className="h-9 px-4 text-xs font-bold rounded-xl bg-[#06C755] hover:bg-[#05b34c] text-white shadow-xs gap-1.5 active:scale-95"
@@ -2684,12 +2861,12 @@ function ReorderPage() {
               </div>
             </div>
 
-            {/* OPTION B: SELECT RECIPIENT FROM SYSTEM DIRECTORY */}
+            {/* OPTION B: SYSTEM DIRECTORY RECIPIENT CARDS (SINGLE SCROLLABLE GRID) */}
             <div className="space-y-3 p-3.5 rounded-2xl border bg-muted/20">
               <div className="flex items-center justify-between flex-wrap gap-2">
                 <Label className="text-xs sm:text-sm font-bold flex items-center gap-1.5 text-foreground">
                   <User className="size-4 text-emerald-600" />
-                  เลือกจากรายชื่อเพื่อน / ซัพพลายเออร์ / กลุ่ม ในระบบ
+                  เลือกจากรายชื่อเพื่อน / ซัพพลายเออร์ ในระบบ
                 </Label>
                 <Button
                   type="button"
@@ -2703,7 +2880,7 @@ function ReorderPage() {
                 </Button>
               </div>
 
-              {/* Add New Contact Form */}
+              {/* Add New Contact Inline Form */}
               {isAddingContact && (
                 <div className="p-3 border rounded-xl bg-card space-y-2.5 animate-in fade-in-50">
                   <div className="text-xs font-bold text-foreground">
@@ -2712,13 +2889,13 @@ function ReorderPage() {
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     <Input
                       placeholder="ชื่อผู้ติดต่อ / ร้านค้า / ซัพพลายเออร์"
-                      className="h-9 text-xs rounded-lg"
+                      className="h-9 text-base md:text-xs rounded-lg"
                       value={newContactName}
                       onChange={(e) => setNewContactName(e.target.value)}
                     />
                     <Input
                       placeholder="LINE ID (เช่น Uxxxx หรือ Cxxxx)"
-                      className="h-9 font-mono text-xs rounded-lg"
+                      className="h-9 font-mono text-base md:text-xs rounded-lg"
                       value={newContactId}
                       onChange={(e) => setNewContactId(e.target.value)}
                     />
@@ -2752,75 +2929,32 @@ function ReorderPage() {
                 </div>
               )}
 
-              {/* Recipient Filter Tabs */}
-              <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
-                <Button
-                  type="button"
-                  size="sm"
-                  variant={recipientFilterTab === "ALL" ? "default" : "outline"}
-                  className={`h-7 text-xs rounded-lg px-2.5 font-medium ${
-                    recipientFilterTab === "ALL"
-                      ? "bg-emerald-600 text-white hover:bg-emerald-700"
-                      : "text-muted-foreground"
-                  }`}
-                  onClick={() => setRecipientFilterTab("ALL")}
-                >
-                  ทั้งหมด ({followers.length})
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant={recipientFilterTab === "SUPPLIERS" ? "default" : "outline"}
-                  className={`h-7 text-xs rounded-lg px-2.5 font-medium ${
-                    recipientFilterTab === "SUPPLIERS"
-                      ? "bg-emerald-600 text-white hover:bg-emerald-700"
-                      : "text-muted-foreground"
-                  }`}
-                  onClick={() => setRecipientFilterTab("SUPPLIERS")}
-                >
-                  🏢 ซัพพลายเออร์/ร้านส่ง
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant={recipientFilterTab === "GROUPS" ? "default" : "outline"}
-                  className={`h-7 text-xs rounded-lg px-2.5 font-medium ${
-                    recipientFilterTab === "GROUPS"
-                      ? "bg-emerald-600 text-white hover:bg-emerald-700"
-                      : "text-muted-foreground"
-                  }`}
-                  onClick={() => setRecipientFilterTab("GROUPS")}
-                >
-                  👥 กลุ่มแชทไลน์
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant={recipientFilterTab === "STAFF" ? "default" : "outline"}
-                  className={`h-7 text-xs rounded-lg px-2.5 font-medium ${
-                    recipientFilterTab === "STAFF"
-                      ? "bg-emerald-600 text-white hover:bg-emerald-700"
-                      : "text-muted-foreground"
-                  }`}
-                  onClick={() => setRecipientFilterTab("STAFF")}
-                >
-                  👤 ผู้ดูแล/พนักงาน
-                </Button>
-              </div>
-
-              {/* Search Box */}
-              <div className="relative">
-                <Search className="size-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  placeholder="ค้นหาชื่อเพื่อน, พนักงาน, ซัพพลายเออร์, หรือ User ID..."
-                  className="h-9 pl-9 text-xs rounded-xl bg-background"
-                  value={friendSearchQuery}
-                  onChange={(e) => setFriendSearchQuery(e.target.value)}
+              {/* Broadcast Option */}
+              <div className="flex items-center justify-between p-2.5 rounded-xl border bg-background">
+                <div className="space-y-0.5">
+                  <Label className="text-xs font-semibold flex items-center gap-1.5 text-foreground cursor-pointer">
+                    <Users className="size-3.5 text-primary" />
+                    บรอดแคสต์ส่งถึงทุกคน (Broadcast to all followers)
+                  </Label>
+                  <p className="text-[10px] text-muted-foreground">
+                    ส่ง Flex Message ไปยังเพื่อนและกลุ่มแชททุกคนพร้อมกัน
+                  </p>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={isBroadcastMode}
+                  onChange={(e) => {
+                    setIsBroadcastMode(e.target.checked);
+                    if (e.target.checked) {
+                      setTargetIdInput("");
+                    }
+                  }}
+                  className="size-4 rounded accent-emerald-600 cursor-pointer"
                 />
               </div>
 
-              {/* Contact List Cards Grid */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-56 overflow-y-auto p-1 border rounded-xl bg-card">
+              {/* Contact List Cards Grid (No nested scroll - renders in single layer main body) */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 {followers
                   .filter((f) => {
                     const query = friendSearchQuery.toLowerCase().trim();
@@ -2874,9 +3008,9 @@ function ReorderPage() {
                       <button
                         key={f.userId}
                         type="button"
-                        className={`flex items-center gap-3 p-2.5 rounded-xl border text-left transition-all ${
+                        className={`flex items-center gap-3 p-3 rounded-2xl border text-left transition-all active:scale-[0.99] cursor-pointer ${
                           isSelected
-                            ? "border-emerald-500 bg-emerald-50/80 dark:bg-emerald-950/40 ring-2 ring-emerald-500 shadow-xs"
+                            ? "border-emerald-500 bg-emerald-50/90 dark:bg-emerald-950/40 ring-2 ring-emerald-500 shadow-sm"
                             : "border-border bg-card hover:bg-muted/60"
                         }`}
                         onClick={() => {
@@ -2884,7 +3018,7 @@ function ReorderPage() {
                           setIsBroadcastMode(false);
                         }}
                       >
-                        <div className="relative size-10 shrink-0 rounded-full overflow-hidden bg-muted flex items-center justify-center font-bold text-xs text-muted-foreground border">
+                        <div className="relative size-11 shrink-0 rounded-full overflow-hidden bg-muted flex items-center justify-center font-bold text-xs text-muted-foreground border">
                           {f.pictureUrl ? (
                             <img
                               src={f.pictureUrl}
@@ -2897,7 +3031,7 @@ function ReorderPage() {
                         </div>
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center justify-between gap-1">
-                            <span className="font-bold text-xs text-foreground truncate">
+                            <span className="font-bold text-xs sm:text-sm text-foreground truncate">
                               {f.displayName}
                             </span>
                             {isSelected && (
@@ -2930,44 +3064,58 @@ function ReorderPage() {
                             </span>
                           </div>
                         </div>
+
+                        {/* Quick Selection Status Indicator */}
+                        <div className="shrink-0 pl-1">
+                          {isSelected ? (
+                            <span className="text-[10px] font-bold text-emerald-600 bg-emerald-100 dark:bg-emerald-900/60 px-2 py-1 rounded-lg">
+                              เลือกแล้ว
+                            </span>
+                          ) : (
+                            <span className="text-[10px] text-muted-foreground bg-muted/60 px-2 py-1 rounded-lg group-hover:bg-muted">
+                              เลือก
+                            </span>
+                          )}
+                        </div>
                       </button>
                     );
                   })}
               </div>
 
-              {/* Broadcast Option */}
-              <div className="flex items-center justify-between p-2.5 rounded-xl border bg-background">
-                <div className="space-y-0.5">
-                  <Label className="text-xs font-semibold flex items-center gap-1.5 text-foreground cursor-pointer">
-                    <Users className="size-3.5 text-primary" />
-                    บรอดแคสต์ส่งถึงทุกคน (Broadcast to all followers)
-                  </Label>
-                  <p className="text-[10px] text-muted-foreground">
-                    ส่ง Flex Message ไปยังเพื่อนและกลุ่มแชททุกคนพร้อมกัน
-                  </p>
+              {/* Empty state if search yields no result */}
+              {followers.filter((f) => {
+                const query = friendSearchQuery.toLowerCase().trim();
+                return (
+                  !query ||
+                  f.displayName.toLowerCase().includes(query) ||
+                  f.userId.toLowerCase().includes(query) ||
+                  (f.statusMessage && f.statusMessage.toLowerCase().includes(query))
+                );
+              }).length === 0 && (
+                <div className="text-center py-6 text-muted-foreground text-xs space-y-2">
+                  <User className="size-8 mx-auto text-muted-foreground/50" />
+                  <p>ไม่พบรายชื่อผู้ติดต่อที่ตรงกับคำค้นหา "{friendSearchQuery}"</p>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-8 text-xs rounded-xl"
+                    onClick={() => setFriendSearchQuery("")}
+                  >
+                    ล้างคำค้นหา
+                  </Button>
                 </div>
-                <input
-                  type="checkbox"
-                  checked={isBroadcastMode}
-                  onChange={(e) => {
-                    setIsBroadcastMode(e.target.checked);
-                    if (e.target.checked) {
-                      setTargetIdInput("");
-                    }
-                  }}
-                  className="size-4 rounded accent-emerald-600 cursor-pointer"
-                />
-              </div>
+              )}
 
               {/* Manual Recipient ID Input */}
               {!isBroadcastMode && (
-                <div className="space-y-1">
+                <div className="space-y-1 pt-1">
                   <Label className="text-[11px] font-semibold text-muted-foreground">
                     หรือระบุ LINE Group ID หรือ User ID ด้วยตนเอง:
                   </Label>
                   <Input
                     placeholder="เช่น Cxxxxxxxxxx (Group ID) หรือ Uxxxxxxxxxx (User ID)"
-                    className="h-8 font-mono text-xs rounded-lg bg-background"
+                    className="h-9 font-mono text-base md:text-xs rounded-xl bg-background"
                     value={targetIdInput}
                     onChange={(e) => setTargetIdInput(e.target.value)}
                   />
@@ -2975,7 +3123,7 @@ function ReorderPage() {
               )}
             </div>
 
-            {/* REAL LINE FLEX MESSAGE PREVIEW BUBBLE */}
+            {/* REAL LINE FLEX MESSAGE PREVIEW BUBBLE (Single Scroll - No Inner Scrollbar) */}
             <div className="rounded-2xl border border-emerald-500/30 overflow-hidden bg-card shadow-2xs">
               <div className="bg-emerald-600 text-white px-3.5 py-2 flex items-center justify-between">
                 <div className="flex items-center gap-1.5 text-xs font-bold">
@@ -3010,7 +3158,7 @@ function ReorderPage() {
                   <span className="text-[11px] text-muted-foreground">ร้าน MiniMark</span>
                 </div>
 
-                <div className="space-y-1 max-h-28 overflow-y-auto pr-1">
+                <div className="space-y-1">
                   {pushMessageType === "STOCK_ALERT" ? (
                     allReorderNeeded.slice(0, 5).map((p, idx) => (
                       <div
@@ -3061,13 +3209,16 @@ function ReorderPage() {
                 </div>
               </div>
             </div>
+          </div>
 
+          {/* STICKY BOTTOM FOOTER (Single Bar, Keyboard-Safe, Returns to Main Page on Completion) */}
+          <div className="shrink-0 border-t bg-background/95 backdrop-blur-md p-3 sm:p-4 shadow-lg pb-[max(env(safe-area-inset-bottom),0.75rem)] z-20 space-y-2">
             {/* Selected Recipient Summary Card */}
-            <div className="p-3 rounded-xl border bg-emerald-500/10 border-emerald-500/25 flex items-center justify-between gap-2 text-xs">
-              <div className="flex items-center gap-2">
-                <Check className="size-4 text-emerald-600 font-bold" />
-                <span className="text-muted-foreground">ผู้รับ Flex Message:</span>
-                <span className="font-bold text-foreground">
+            <div className="p-2.5 rounded-xl border bg-emerald-500/10 border-emerald-500/25 flex items-center justify-between gap-2 text-xs">
+              <div className="flex items-center gap-2 min-w-0">
+                <Check className="size-4 text-emerald-600 font-bold shrink-0" />
+                <span className="text-muted-foreground shrink-0">ผู้รับ Flex:</span>
+                <span className="font-bold text-foreground truncate">
                   {isBroadcastMode
                     ? "📢 บรอดแคสต์ถึงทุกคน (Broadcast All)"
                     : targetIdInput
@@ -3076,50 +3227,60 @@ function ReorderPage() {
                       : "ยังไม่ได้เลือกผู้รับ"}
                 </span>
               </div>
-              <Badge variant="outline" className="text-[10px] border-emerald-600 text-emerald-700">
+              <Badge
+                variant="outline"
+                className="text-[10px] border-emerald-600 text-emerald-700 shrink-0 hidden sm:inline-flex"
+              >
                 Flex Bubble Format
               </Badge>
             </div>
-          </div>
 
-          <DialogFooter className="gap-2 pt-2 border-t flex-wrap">
-            <Button
-              type="button"
-              variant="outline"
-              className="h-11 rounded-xl text-xs gap-1.5"
-              onClick={() => {
-                if (pushMessageType === "STOCK_ALERT") {
-                  handlePreviewStockAlertFlex();
-                } else {
-                  handlePreviewOrderFlex();
-                }
-              }}
-            >
-              <Eye className="size-4 text-emerald-600" /> ดูตัวอย่าง Flex ก่อนส่ง
-            </Button>
-            <Button
-              variant="outline"
-              className="h-11 rounded-xl text-xs"
-              onClick={() => setPushModalOpen(false)}
-            >
-              ยกเลิก
-            </Button>
-            <Button
-              className="h-11 rounded-xl font-bold gap-1.5 bg-[#06C755] hover:bg-[#05b34c] text-white text-xs shadow-xs px-5 active:scale-95"
-              onClick={handleSendServerPush}
-              disabled={(!isBroadcastMode && !targetIdInput.trim()) || isSending}
-            >
-              <Send className="size-4" />
-              {isSending
-                ? "กำลังส่ง Flex Message..."
-                : isBroadcastMode
-                  ? "ส่ง Flex Message บรอดแคสต์ทุกคน"
-                  : `ส่ง Flex Message ให้ ${
-                      followers.find((f) => f.userId === targetIdInput.trim())?.displayName ||
-                      (targetIdInput ? targetIdInput.slice(0, 10) + "..." : "ผู้รับที่เลือก")
-                    }`}
-            </Button>
-          </DialogFooter>
+            {/* Action Buttons Row */}
+            <div className="flex items-center justify-end gap-2 flex-wrap sm:flex-nowrap">
+              <Button
+                type="button"
+                variant="outline"
+                className="h-10 sm:h-11 rounded-xl text-xs gap-1.5 hidden sm:inline-flex"
+                onClick={() => {
+                  if (pushMessageType === "STOCK_ALERT") {
+                    handlePreviewStockAlertFlex();
+                  } else {
+                    handlePreviewOrderFlex();
+                  }
+                }}
+              >
+                <Eye className="size-4 text-emerald-600" /> ตัวอย่าง Flex
+              </Button>
+
+              {/* Close / Return Button */}
+              <Button
+                type="button"
+                variant="outline"
+                className="h-10 sm:h-11 rounded-xl text-xs flex-1 sm:flex-none"
+                onClick={() => setPushModalOpen(false)}
+              >
+                {targetIdInput || isBroadcastMode ? "เลือกผู้รับนี้แล้วกลับ" : "ยกเลิก"}
+              </Button>
+
+              {/* Primary Send Button (Sends Flex Message and Closes Panel) */}
+              <Button
+                type="button"
+                className="h-10 sm:h-11 rounded-xl font-bold gap-1.5 bg-[#06C755] hover:bg-[#05b34c] text-white text-xs shadow-xs px-4 sm:px-5 active:scale-95 flex-1 sm:flex-none"
+                onClick={handleSendServerPush}
+                disabled={(!isBroadcastMode && !targetIdInput.trim()) || isSending}
+              >
+                <Send className="size-4" />
+                {isSending
+                  ? "กำลังส่ง Flex Message..."
+                  : isBroadcastMode
+                    ? "ส่ง Flex Message บรอดแคสต์ทุกคน"
+                    : `ส่ง Flex Message ให้ ${
+                        followers.find((f) => f.userId === targetIdInput.trim())?.displayName ||
+                        (targetIdInput ? targetIdInput.slice(0, 10) + "..." : "ผู้รับที่เลือก")
+                      }`}
+              </Button>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
 
