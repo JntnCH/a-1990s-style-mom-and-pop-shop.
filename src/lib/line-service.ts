@@ -11,7 +11,7 @@ import {
   createStockAlertFlexBubble,
   type FlexStockAlertItem,
 } from "./flex-templates";
-import { sendLineMessagingApiFn } from "./line-server-fn";
+import { getLineServerConfigFn, sendLineMessagingApiFn } from "./line-server-fn";
 
 export interface LineOrderItem {
   product: ProductItem;
@@ -29,29 +29,56 @@ export interface LineConfigStatus {
   error?: string | undefined;
 }
 
-// Retrieve LIFF ID from localStorage, Vite env, or runtime config
+let memoryLiffId: string | null = null;
+
+// Retrieve LIFF ID from memory, localStorage, Vite env, or runtime config
 export function getClientLiffId(): string | null {
-  if (typeof window === "undefined") return null;
-  const local = localStorage.getItem("minimark_line_liff_id");
-  if (local && local.trim() && local.trim() !== "xxxxx-xxxxx") {
-    return local.trim();
+  if (memoryLiffId && memoryLiffId.trim() && memoryLiffId.trim() !== "xxxxx-xxxxx") {
+    return memoryLiffId.trim();
+  }
+  if (typeof window !== "undefined") {
+    const w = window as unknown as { __MINIMARK_LIFF_ID?: string };
+    if (
+      w.__MINIMARK_LIFF_ID &&
+      w.__MINIMARK_LIFF_ID.trim() &&
+      w.__MINIMARK_LIFF_ID.trim() !== "xxxxx-xxxxx"
+    ) {
+      memoryLiffId = w.__MINIMARK_LIFF_ID.trim();
+      return memoryLiffId;
+    }
+    const local = localStorage.getItem("minimark_line_liff_id");
+    if (local && local.trim() && local.trim() !== "xxxxx-xxxxx") {
+      memoryLiffId = local.trim();
+      return memoryLiffId;
+    }
   }
   const id =
     import.meta.env["VITE_LINE_LIFF_ID"] ||
     import.meta.env["LINE_LIFF_ID"] ||
-    import.meta.env["VITE_LIFF_ID"];
+    import.meta.env["VITE_LIFF_ID"] ||
+    import.meta.env["LIFF_ID"];
   if (id && typeof id === "string" && id.trim() !== "" && id.trim() !== "xxxxx-xxxxx") {
-    return id.trim();
+    memoryLiffId = id.trim();
+    return memoryLiffId;
   }
   return null;
 }
 
 export function setClientLiffId(id: string): void {
-  if (typeof window === "undefined") return;
-  if (!id || !id.trim()) {
-    localStorage.removeItem("minimark_line_liff_id");
+  if (!id || !id.trim() || id.trim() === "xxxxx-xxxxx") {
+    memoryLiffId = null;
+    if (typeof window !== "undefined") {
+      const w = window as unknown as { __MINIMARK_LIFF_ID?: string };
+      delete w.__MINIMARK_LIFF_ID;
+      localStorage.removeItem("minimark_line_liff_id");
+    }
   } else {
-    localStorage.setItem("minimark_line_liff_id", id.trim());
+    memoryLiffId = id.trim();
+    if (typeof window !== "undefined") {
+      const w = window as unknown as { __MINIMARK_LIFF_ID?: string };
+      w.__MINIMARK_LIFF_ID = id.trim();
+      localStorage.setItem("minimark_line_liff_id", id.trim());
+    }
   }
   liffInstance = null;
   liffInitPromise = null;
@@ -65,7 +92,18 @@ let liffInitPromise: Promise<boolean> | null = null;
  */
 export async function initLiff(): Promise<boolean> {
   if (typeof window === "undefined") return false;
-  const liffId = getClientLiffId();
+  let liffId = getClientLiffId();
+  if (!liffId) {
+    try {
+      const cfg = await getLineServerConfigFn();
+      if (cfg?.configuredLiffId) {
+        setClientLiffId(cfg.configuredLiffId);
+        liffId = cfg.configuredLiffId;
+      }
+    } catch {
+      // ignore
+    }
+  }
   if (!liffId) {
     return false;
   }
@@ -225,13 +263,25 @@ export async function shareFlexViaLiffPicker(
     return { success: false, message: "ทำงานบนเบราว์เซอร์เท่านั้น" };
   }
 
-  const liffId = getClientLiffId();
+  let liffId = getClientLiffId();
+  if (!liffId) {
+    try {
+      const cfg = await getLineServerConfigFn();
+      if (cfg?.configuredLiffId) {
+        setClientLiffId(cfg.configuredLiffId);
+        liffId = cfg.configuredLiffId;
+      }
+    } catch {
+      // ignore
+    }
+  }
+
   if (!liffId) {
     return {
       success: false,
-      needLiffId: true,
+      needLiffId: false,
       message:
-        "ยังไม่ได้ระบุ LINE LIFF ID ในระบบ กรุณาระบุ LIFF ID เพื่อเปิดรายชื่อเพื่อนในแอป LINE",
+        "ไม่พบคีย์ LINE_LIFF_ID ใน GitHub Secrets หรือ Server Environment (ระบบดึงคีย์อัตโนมัติ ไม่มีการให้กรอกคีย์บนหน้าเว็บ กรุณาตรวจสอบการตั้งค่าคีย์ใน GitHub Secrets)",
     };
   }
 

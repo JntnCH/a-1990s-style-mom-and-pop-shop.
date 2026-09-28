@@ -122,6 +122,9 @@ export const getLineServerConfigFn = createServerFn({ method: "GET" }).handler(a
     process.env["LINE_LIFF_ID"] ||
     process.env["VITE_LINE_LIFF_ID"] ||
     process.env["LIFF_ID"] ||
+    process.env["LINE_LIFF"] ||
+    process.env["LIFFID"] ||
+    process.env["VITE_LIFF_ID"] ||
     ""
   ).trim();
   const validLiff = envLiff && envLiff !== "xxxxx-xxxxx" ? envLiff : undefined;
@@ -129,16 +132,29 @@ export const getLineServerConfigFn = createServerFn({ method: "GET" }).handler(a
   const hasAccessToken = Boolean(
     process.env["LINE_CHANNEL_ACCESS_TOKEN"] ||
     process.env["LINE_ACCESS_TOKEN"] ||
-    process.env["LINE_TOKEN"],
+    process.env["LINE_TOKEN"] ||
+    process.env["CHANNEL_ACCESS_TOKEN"] ||
+    process.env["ACCESS_TOKEN"] ||
+    process.env["LINE_BOT_TOKEN"] ||
+    process.env["LINE_MESSAGING_TOKEN"],
   );
 
   return {
     hasChannelId: Boolean(process.env["LINE_CHANNEL_ID"] || process.env["CHANNEL_ID"]),
-    hasChannelSecret: Boolean(process.env["LINE_CHANNEL_SECRET"] || process.env["CHANNEL_SECRET"]),
+    hasChannelSecret: Boolean(
+      process.env["LINE_CHANNEL_SECRET"] ||
+      process.env["CHANNEL_SECRET"] ||
+      process.env["LINE_SECRET"],
+    ),
     hasAccessToken,
     hasServerLiffId: Boolean(validLiff),
     configuredLiffId: validLiff,
-    hasLineToId: Boolean(process.env["LINE_TO_ID"] || process.env["LINE_TARGET_ID"]),
+    hasLineToId: Boolean(
+      process.env["LINE_TO_ID"] ||
+      process.env["LINE_TARGET_ID"] ||
+      process.env["LINE_USER_ID"] ||
+      process.env["LINE_RECEIVER_ID"],
+    ),
   };
 });
 
@@ -353,6 +369,10 @@ export const sendLineMessagingApiFn = createServerFn({ method: "POST" })
       process.env["LINE_CHANNEL_ACCESS_TOKEN"] ||
       process.env["LINE_ACCESS_TOKEN"] ||
       process.env["LINE_TOKEN"] ||
+      process.env["CHANNEL_ACCESS_TOKEN"] ||
+      process.env["ACCESS_TOKEN"] ||
+      process.env["LINE_BOT_TOKEN"] ||
+      process.env["LINE_MESSAGING_TOKEN"] ||
       data.channelAccessToken
     )?.trim();
 
@@ -361,12 +381,18 @@ export const sendLineMessagingApiFn = createServerFn({ method: "POST" })
         success: false,
         configured: false,
         error:
-          "ยังไม่ได้ตั้งค่า LINE_CHANNEL_ACCESS_TOKEN (กรุณาระบุ Channel Access Token ในช่องตั้งค่า หรือตั้งใน GitHub Secrets / Cloud Run เพื่อส่ง Flex Message)",
+          "ยังไม่ได้ตั้งค่า LINE_CHANNEL_ACCESS_TOKEN ใน GitHub Secrets หรือ Server Environment กรุณาตรวจสอบการตั้งค่าคีย์ใน GitHub Secrets",
       };
     }
 
     const isBroadcast = Boolean(data.isBroadcast);
-    const configuredTargets = (process.env["LINE_TO_ID"] || process.env["LINE_TARGET_ID"] || "")
+    const configuredTargets = (
+      process.env["LINE_TO_ID"] ||
+      process.env["LINE_TARGET_ID"] ||
+      process.env["LINE_USER_ID"] ||
+      process.env["LINE_RECEIVER_ID"] ||
+      ""
+    )
       .split(",")
       .map((value) => value.trim())
       .filter(Boolean);
@@ -376,7 +402,8 @@ export const sendLineMessagingApiFn = createServerFn({ method: "POST" })
       return {
         success: false,
         configured: true,
-        error: "ยังไม่ได้ตั้งค่า LINE_TO_ID บน Server หรือระบุ LINE recipient ID",
+        error:
+          "ยังไม่ได้ระบุผู้รับปลายทาง (LINE_TO_ID ใน GitHub Secrets หรือเลือกผู้รับจากรายชื่อ)",
       };
     }
 

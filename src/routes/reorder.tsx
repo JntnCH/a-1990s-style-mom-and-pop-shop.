@@ -33,7 +33,6 @@ import {
   Save,
   Search,
   Send,
-  Settings2,
   Share2,
   Sliders,
   SlidersHorizontal,
@@ -198,13 +197,6 @@ function ReorderPage() {
   const [recipientFilterTab, setRecipientFilterTab] = useState<
     "ALL" | "SUPPLIERS" | "GROUPS" | "STAFF"
   >("ALL");
-  const [liffIdDialogOpen, setLiffIdDialogOpen] = useState(false);
-  const [liffIdInputValue, setLiffIdInputValue] = useState(() => {
-    if (typeof window !== "undefined") {
-      return getClientLiffId() || "";
-    }
-    return "";
-  });
   const [targetIdInput, setTargetIdInput] = useState("");
   const [friendSearchQuery, setFriendSearchQuery] = useState("");
   const [isAddingContact, setIsAddingContact] = useState(false);
@@ -297,7 +289,6 @@ function ReorderPage() {
         setServerConfig(cfg);
         if (cfg?.configuredLiffId) {
           setClientLiffId(cfg.configuredLiffId);
-          setLiffIdInputValue(cfg.configuredLiffId);
         }
       })
       .catch(() => setServerConfig(null));
@@ -776,11 +767,28 @@ function ReorderPage() {
     setIsSending(true);
     setStatusMessage(null);
     try {
-      const liffId = getClientLiffId();
+      let liffId = getClientLiffId();
       if (!liffId) {
-        setLiffIdInputValue("");
-        setLiffIdDialogOpen(true);
+        try {
+          const cfg = await getLineServerConfigFn();
+          if (cfg?.configuredLiffId) {
+            setClientLiffId(cfg.configuredLiffId);
+            liffId = cfg.configuredLiffId;
+          }
+        } catch {
+          // ignore
+        }
+      }
+
+      if (!liffId) {
         setIsSending(false);
+        const errMsg =
+          "ไม่พบคีย์ LINE LIFF ID ใน GitHub Secrets หรือ Server Environment (ระบบดึงคีย์อัตโนมัติ ไม่มีการให้กรอกคีย์บนหน้าเว็บ กรุณาตรวจสอบการตั้งค่าคีย์ใน GitHub Secrets)";
+        setStatusMessage({
+          type: "error",
+          text: errMsg,
+        });
+        toast.error(errMsg);
         return;
       }
 
@@ -797,7 +805,10 @@ function ReorderPage() {
         flexMsg = createStockAlertFlexBubble(alertPayload, { storeName: "ร้าน MiniMark" });
         plainText = `⚠️ แจ้งเตือนสินค้าต้องสั่งซื้อ ${allReorderNeeded.length} รายการ (ร้าน MiniMark)`;
       } else {
-        if (fullItems.length === 0) return;
+        if (fullItems.length === 0) {
+          setIsSending(false);
+          return;
+        }
         const orderDateStr = new Date().toLocaleDateString("th-TH");
         flexMsg = formatDailyOrderFlexMessage(fullItems, orderDateStr);
         plainText = formatOrderPlainText(fullItems, orderDateStr);
@@ -817,8 +828,6 @@ function ReorderPage() {
         });
         toast.success("ส่ง LINE Flex Message ไปยังห้องแชทสำเร็จแล้ว");
         setPushModalOpen(false);
-      } else if (res.needLiffId) {
-        setLiffIdDialogOpen(true);
       } else {
         setStatusMessage({
           type: "error",
@@ -2697,20 +2706,6 @@ function ReorderPage() {
                 <Button
                   type="button"
                   variant="ghost"
-                  size="sm"
-                  className="h-8 px-2 text-xs text-muted-foreground hover:text-foreground rounded-lg gap-1"
-                  onClick={() => {
-                    setLiffIdInputValue(getClientLiffId() || "");
-                    setLiffIdDialogOpen(true);
-                  }}
-                  title="ตั้งค่า LINE LIFF ID"
-                >
-                  <Settings2 className="size-3.5" />
-                  <span className="hidden sm:inline text-[11px]">ตั้งค่า LIFF</span>
-                </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
                   size="icon"
                   className="size-8 text-muted-foreground hover:text-foreground rounded-lg md:hidden"
                   onClick={() => setPushModalOpen(false)}
@@ -3281,62 +3276,6 @@ function ReorderPage() {
               </Button>
             </div>
           </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* LIFF ID CONFIGURATION MODAL */}
-      <Dialog open={liffIdDialogOpen} onOpenChange={setLiffIdDialogOpen}>
-        <DialogContent className="w-[94vw] max-w-md rounded-2xl p-4 sm:p-6">
-          <DialogHeader className="pb-1">
-            <DialogTitle className="text-base sm:text-lg flex items-center gap-2">
-              <Smartphone className="size-5 text-[#06C755]" />
-              ระบุ LINE LIFF ID เพื่อเปิดรายชื่อเพื่อนใน LINE
-            </DialogTitle>
-            <DialogDescription className="text-xs">
-              ระบุ LIFF ID ของคุณจาก LINE Developers Console (เช่น 200xxxxxxxx-xxxxxxxx)
-              เพื่อเปิดใช้งานการเลือกเพื่อนใน LINE ผ่าน Share Target Picker
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-3 py-2">
-            <div className="space-y-1.5">
-              <Label className="text-xs font-semibold">LINE LIFF ID *</Label>
-              <Input
-                placeholder="เช่น 2007xxxxxx-xxxxxxxx"
-                className="h-10 font-mono text-xs rounded-xl"
-                value={liffIdInputValue}
-                onChange={(e) => setLiffIdInputValue(e.target.value)}
-              />
-              <p className="text-[11px] text-muted-foreground">
-                * ระบบจะบันทึกไว้ในเบราว์เซอร์อัตโนมัติ ไม่ต้องกรอกซ้ำ
-              </p>
-            </div>
-          </div>
-
-          <DialogFooter className="gap-2 pt-2 border-t">
-            <Button
-              variant="outline"
-              className="h-10 text-xs rounded-xl"
-              onClick={() => setLiffIdDialogOpen(false)}
-            >
-              ยกเลิก
-            </Button>
-            <Button
-              className="h-10 text-xs font-bold rounded-xl bg-[#06C755] hover:bg-[#05b34c] text-white"
-              onClick={() => {
-                if (!liffIdInputValue.trim()) return;
-                setClientLiffId(liffIdInputValue.trim());
-                setLiffIdDialogOpen(false);
-                toast.success("บันทึก LIFF ID เรียบร้อยแล้ว กำลังเปิดรายชื่อเพื่อน...");
-                setTimeout(() => {
-                  void handleOpenLiffTargetPicker();
-                }, 300);
-              }}
-              disabled={!liffIdInputValue.trim()}
-            >
-              บันทึกและเปิดรายชื่อเพื่อนใน LINE
-            </Button>
-          </DialogFooter>
         </DialogContent>
       </Dialog>
 
