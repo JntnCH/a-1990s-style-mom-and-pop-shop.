@@ -621,78 +621,52 @@ function ReorderPage() {
     window.print();
   };
 
-  // Send Order to LINE - opens recipient & friend selection modal
+  // Send Order to LINE - opens recipient & friend selection modal or opens LINE Picker directly
   const handleSendOrderToLine = (target: "group" | "personal") => {
-    if (fullItems.length === 0) return;
+    if (fullItems.length === 0) {
+      toast.error("ไม่มีรายการสินค้าในใบสั่งซื้อ");
+      return;
+    }
+    if (target === "personal") {
+      // 1-Click Direct Native LINE Friends Picker without another modal page
+      handleOpenLiffTargetPicker("PURCHASE_ORDER");
+      return;
+    }
     setPushMessageType("PURCHASE_ORDER");
     setIsBroadcastMode(false);
-
-    if (target === "group") {
-      setRecipientFilterTab("GROUPS");
-      const groupTarget = followers.find(
-        (f) => f.userId.startsWith("C") || f.role === "viewer" || f.displayName.includes("กลุ่ม"),
-      );
-      if (groupTarget) {
-        setTargetIdInput(groupTarget.userId);
-      } else if (followers.length > 0 && followers[0]) {
-        setTargetIdInput(followers[0].userId);
-      }
-    } else {
-      setRecipientFilterTab("SUPPLIERS");
-      const supplierTarget =
-        followers.find(
-          (f) =>
-            !f.displayName.includes("กลุ่ม") &&
-            (f.displayName.includes("ยูนิลีเวอร์") ||
-              f.displayName.includes("ซัพพลายเออร์") ||
-              f.displayName.includes("ยี่ปั๊ว") ||
-              f.displayName.includes("ค้าส่ง") ||
-              f.displayName.includes("เครื่องดื่ม")),
-        ) ||
-        followers.find((f) => f.userId.startsWith("U") && !f.displayName.includes("กลุ่ม")) ||
-        followers[0];
-
-      if (supplierTarget) {
-        setTargetIdInput(supplierTarget.userId);
-      }
+    setRecipientFilterTab("GROUPS");
+    const groupTarget = followers.find(
+      (f) => f.userId.startsWith("C") || f.role === "viewer" || f.displayName.includes("กลุ่ม"),
+    );
+    if (groupTarget) {
+      setTargetIdInput(groupTarget.userId);
+    } else if (followers.length > 0 && followers[0]) {
+      setTargetIdInput(followers[0].userId);
     }
     setPushModalOpen(true);
   };
 
-  // Send Stock Alert to LINE - opens recipient & friend selection modal
+  // Send Stock Alert to LINE - opens recipient & friend selection modal or opens LINE Picker directly
   const handleSendStockAlertToLine = (target: "group" | "personal") => {
-    if (allReorderNeeded.length === 0) return;
+    if (allReorderNeeded.length === 0) {
+      toast.error("ไม่มีรายการสินค้าที่ต้องแจ้งเตือนสต็อก");
+      return;
+    }
+    if (target === "personal") {
+      // 1-Click Direct Native LINE Friends Picker without another modal page
+      handleOpenLiffTargetPicker("STOCK_ALERT");
+      return;
+    }
     setPushMessageType("STOCK_ALERT");
     setIsBroadcastMode(false);
-
-    if (target === "group") {
-      setRecipientFilterTab("GROUPS");
-      const groupTarget = followers.find(
-        (f) => f.userId.startsWith("C") || f.role === "viewer" || f.displayName.includes("กลุ่ม"),
-      );
-      if (groupTarget) {
-        setTargetIdInput(groupTarget.userId);
-      } else if (followers.length > 0 && followers[0]) {
-        setTargetIdInput(followers[0].userId);
-      }
-    } else {
-      setRecipientFilterTab("SUPPLIERS");
-      const supplierTarget =
-        followers.find(
-          (f) =>
-            !f.displayName.includes("กลุ่ม") &&
-            (f.displayName.includes("ยูนิลีเวอร์") ||
-              f.displayName.includes("ซัพพลายเออร์") ||
-              f.displayName.includes("ยี่ปั๊ว") ||
-              f.displayName.includes("ค้าส่ง") ||
-              f.displayName.includes("เครื่องดื่ม")),
-        ) ||
-        followers.find((f) => f.userId.startsWith("U") && !f.displayName.includes("กลุ่ม")) ||
-        followers[0];
-
-      if (supplierTarget) {
-        setTargetIdInput(supplierTarget.userId);
-      }
+    setRecipientFilterTab("GROUPS");
+    const groupTarget = followers.find(
+      (f) => f.userId.startsWith("C") || f.role === "viewer" || f.displayName.includes("กลุ่ม"),
+    );
+    if (groupTarget) {
+      setTargetIdInput(groupTarget.userId);
+    } else if (followers.length > 0 && followers[0]) {
+      setTargetIdInput(followers[0].userId);
     }
     setPushModalOpen(true);
   };
@@ -765,7 +739,8 @@ function ReorderPage() {
   };
 
   // Open Native LINE Contact Picker (shareTargetPicker)
-  const handleOpenLiffTargetPicker = async () => {
+  const handleOpenLiffTargetPicker = async (overrideType?: "PURCHASE_ORDER" | "STOCK_ALERT") => {
+    const msgType = overrideType || pushMessageType;
     setIsSending(true);
     setStatusMessage(null);
     try {
@@ -796,7 +771,7 @@ function ReorderPage() {
 
       let flexMsg: unknown;
       let plainText = "";
-      if (pushMessageType === "STOCK_ALERT") {
+      if (msgType === "STOCK_ALERT") {
         const alertPayload = allReorderNeeded.map((p) => ({
           name: p.name,
           stock: p.stock,
@@ -809,6 +784,7 @@ function ReorderPage() {
       } else {
         if (fullItems.length === 0) {
           setIsSending(false);
+          toast.error("ไม่มีรายการสินค้าในใบสั่งซื้อ");
           return;
         }
         const orderDateStr = new Date().toLocaleDateString("th-TH");
@@ -821,7 +797,7 @@ function ReorderPage() {
 
       if (res.success) {
         playScanSuccessSound({ force: true });
-        if (pushMessageType === "PURCHASE_ORDER") {
+        if (msgType === "PURCHASE_ORDER") {
           handleSavePO("ORDERED");
         }
         setStatusMessage({
@@ -1768,11 +1744,11 @@ function ReorderPage() {
                         size="lg"
                         variant="outline"
                         disabled={fullItems.length === 0 || isSending}
-                        className="h-11 w-full gap-1.5 border-emerald-600 text-emerald-700 hover:bg-emerald-50 dark:text-emerald-300 font-semibold text-xs rounded-xl active:scale-95"
+                        className="h-11 w-full gap-1.5 border-emerald-600 text-emerald-700 hover:bg-emerald-50 dark:text-emerald-300 font-semibold text-xs rounded-xl active:scale-95 shadow-xs"
                         onClick={() => handleSendOrderToLine("personal")}
                       >
-                        <Share2 className="size-4 shrink-0" />
-                        <span className="truncate">ส่ง LINE ส่วนตัว</span>
+                        <Users className="size-4 shrink-0 text-[#06C755]" />
+                        <span className="truncate">ส่ง LINE ส่วนตัว (เลือกเพื่อน)</span>
                       </Button>
                     </div>
 
