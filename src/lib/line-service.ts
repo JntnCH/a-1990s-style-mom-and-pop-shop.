@@ -101,13 +101,19 @@ export function setClientLiffId(id: string): void {
 }
 
 let liffInstance: typeof import("@line/liff").default | null = null;
-let liffInitPromise: Promise<boolean> | null = null;
+let isInitializingLiff = false;
 
 /**
  * Initializes LINE LIFF SDK safely (Browser-only)
  */
 export async function initLiff(): Promise<boolean> {
   if (typeof window === "undefined") return false;
+  if (liffInstance) return true;
+  if (isInitializingLiff) {
+    await new Promise((resolve) => setTimeout(resolve, 400));
+    if (liffInstance) return true;
+  }
+
   let liffId = getClientLiffId();
   if (!liffId) {
     try {
@@ -124,37 +130,23 @@ export async function initLiff(): Promise<boolean> {
     return false;
   }
 
-  if (liffInitPromise) {
-    return liffInitPromise;
-  }
+  isInitializingLiff = true;
+  try {
+    const liffMod = await import("@line/liff");
+    const liff = liffMod.default;
 
-  liffInitPromise = (async () => {
-    try {
-      const liffMod = await import("@line/liff");
-      const liff = liffMod.default;
-      liffInstance = liff;
-
-      // CRITICAL: withLoginOnExternalBrowser MUST be false to prevent automatic redirection to access.line.me (400 Bad Request)
-      const initPromise = liff.init({ liffId, withLoginOnExternalBrowser: false }).then(() => true);
-      const timeoutPromise = new Promise<boolean>((resolve) =>
-        setTimeout(() => resolve(false), 3500),
-      );
-
-      const res = await Promise.race([
-        initPromise.catch((err) => {
-          console.warn("LIFF initialization note:", err);
-          return false;
-        }),
-        timeoutPromise,
-      ]);
-      return res;
-    } catch (err) {
-      console.warn("LIFF initialization note:", err);
-      return false;
+    if (!liff.id) {
+      await liff.init({ liffId, withLoginOnExternalBrowser: false });
     }
-  })();
-
-  return liffInitPromise;
+    liffInstance = liff;
+    return true;
+  } catch (err) {
+    console.warn("LIFF initialization note:", err);
+    liffInstance = null;
+    return false;
+  } finally {
+    isInitializingLiff = false;
+  }
 }
 
 /**
@@ -351,11 +343,15 @@ export async function shareFlexViaLiffPicker(
   }
 
   try {
-    let messagePayload: unknown;
+    let messagePayload: Record<string, unknown>;
     if (flexMessage && typeof flexMessage === "object") {
       const flexObj = flexMessage as Record<string, unknown>;
-      if (flexObj["type"] === "flex") {
-        messagePayload = flexObj;
+      if (flexObj["type"] === "flex" && flexObj["contents"]) {
+        messagePayload = {
+          type: "flex",
+          altText: (flexObj["altText"] as string) || altSummary,
+          contents: flexObj["contents"],
+        };
       } else if (flexObj["type"] === "bubble" || flexObj["type"] === "carousel") {
         messagePayload = {
           type: "flex",
@@ -369,17 +365,14 @@ export async function shareFlexViaLiffPicker(
           contents: flexObj["contents"],
         };
       } else {
-        messagePayload = { type: "flex", altText: altSummary, contents: flexObj };
+        messagePayload = {
+          type: "flex",
+          altText: altSummary,
+          contents: flexObj,
+        };
       }
     } else {
       messagePayload = { type: "text", text: altSummary };
-    }
-
-    if (
-      typeof liffInstance.isApiAvailable === "function" &&
-      !liffInstance.isApiAvailable("shareTargetPicker")
-    ) {
-      console.warn("isApiAvailable('shareTargetPicker') returned false, attempting direct call...");
     }
 
     if (typeof liffInstance.shareTargetPicker === "function") {
@@ -399,7 +392,18 @@ export async function shareFlexViaLiffPicker(
     };
   } catch (err: unknown) {
     const errMsg = err instanceof Error ? err.message : String(err);
-    return { success: false, message: `เกิดข้อผิดพลาดจาก LINE: ${errMsg}` };
+    if (
+      errMsg.toLowerCase().includes("permission") ||
+      errMsg.toLowerCase().includes("not available") ||
+      errMsg.toLowerCase().includes("api")
+    ) {
+      return {
+        success: false,
+        message:
+          "ยังไม่ได้เปิดฟังก์ชัน Share Target Picker ใน LINE Developers Console (กรุณาปรับ Share Target Picker เป็น ON ในแท็บ LIFF)",
+      };
+    }
+    return { success: false, message: `LINE Share Target Picker แจ้งเตือน: ${errMsg}` };
   }
 }
 
