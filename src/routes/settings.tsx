@@ -1,7 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
 import {
   AlertCircle,
+  Bot,
+  Check,
   CheckCircle2,
+  Copy,
   Database,
   ExternalLink,
   Eye,
@@ -18,6 +21,8 @@ import {
   Send,
   ShieldAlert,
   ShieldCheck,
+  Smartphone,
+  Sparkles,
   Trash2,
   UserCheck,
   UserPlus,
@@ -62,6 +67,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   createDailySummaryFlexBubble,
+  createMiniAppPortalFlexBubble,
   createPurchaseOrderFlexBubble,
   createStockAlertFlexBubble,
 } from "@/lib/flex-templates";
@@ -69,6 +75,7 @@ import {
   getLineFollowersHistoryFn,
   getLineServerConfigFn,
   registerLineFollowerFn,
+  sendMiniAppPortalCardFn,
   syncMasterDatabaseFn,
 } from "@/lib/line-server-fn";
 import { getClientLiffId, getLineStatus, type LineConfigStatus } from "@/lib/line-service";
@@ -406,6 +413,69 @@ function SettingsPage() {
     setPreviewFlexModalOpen(true);
   };
 
+  // LINE Portal Test Send & Copy State
+  const [portalSending, setPortalSending] = useState(false);
+  const [portalStatusMsg, setPortalStatusMsg] = useState<{
+    type: "success" | "error";
+    text: string;
+  } | null>(null);
+  const [copiedKey, setCopiedKey] = useState<string | null>(null);
+
+  const handleCopyLink = (text: string, key: string) => {
+    if (typeof navigator !== "undefined" && navigator.clipboard) {
+      navigator.clipboard.writeText(text);
+      setCopiedKey(key);
+      setTimeout(() => setCopiedKey(null), 2500);
+    }
+  };
+
+  const handlePreviewPortalFlex = () => {
+    const liffId = clientLiffId || "2007000000-xxxxxx";
+    const bubble = createMiniAppPortalFlexBubble({
+      storeName: "ร้าน MiniMark",
+      liffId,
+    });
+    setPreviewFlexTitle("การ์ดทางเข้า Mini App (mini-app-portal-flex.ts)");
+    setPreviewFlexJson(bubble);
+    setPreviewFlexModalOpen(true);
+  };
+
+  const handleSendPortalCard = async (targetUserId?: string, isBroadcast: boolean = false) => {
+    setPortalSending(true);
+    setPortalStatusMsg(null);
+    try {
+      const res = await sendMiniAppPortalCardFn({
+        data: {
+          toUserId: targetUserId,
+          isBroadcast,
+          storeName: "ร้าน MiniMark",
+          liffId: clientLiffId || undefined,
+        },
+      });
+
+      if (res.success) {
+        setPortalStatusMsg({
+          type: "success",
+          text: isBroadcast
+            ? "บรอดแคสต์การ์ดทางเข้า Mini App ไปยังทุกคนใน LINE สำเร็จเรียบร้อย"
+            : `ส่งการ์ดทางเข้า Mini App ไปยัง LINE สำเร็จเรียบร้อย`,
+        });
+      } else {
+        setPortalStatusMsg({
+          type: "error",
+          text: res.error || "ไม่สามารถส่งการ์ดทางเข้า Mini App ได้",
+        });
+      }
+    } catch (err) {
+      setPortalStatusMsg({
+        type: "error",
+        text: `Error: ${String(err)}`,
+      });
+    } finally {
+      setPortalSending(false);
+    }
+  };
+
   return (
     <PermissionGuard
       permission="canAccessSettings"
@@ -662,7 +732,7 @@ function SettingsPage() {
               </p>
             </div>
 
-            <div className="grid gap-4 md:grid-cols-3">
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
               {/* Card 1: Purchase Order */}
               <Card className="rounded-2xl border bg-card p-4 space-y-3 shadow-xs hover:border-emerald-500/50 transition-colors">
                 <div className="flex items-center justify-between">
@@ -734,6 +804,30 @@ function SettingsPage() {
                   size="sm"
                   className="w-full rounded-xl text-xs gap-1.5 font-semibold text-blue-600 dark:text-blue-400"
                   onClick={handlePreviewDailySummaryFlex}
+                >
+                  <Eye className="size-3.5" /> ดูตัวอย่าง Flex Message
+                </Button>
+              </Card>
+
+              {/* Card 4: Mini App Portal Card */}
+              <Card className="rounded-2xl border bg-card p-4 space-y-3 shadow-xs hover:border-[#06C755] transition-colors">
+                <div className="flex items-center justify-between">
+                  <Badge className="bg-[#06C755] text-white text-xs">ทางเข้า Mini App</Badge>
+                  <span className="font-mono text-[11px] text-muted-foreground">
+                    mini-app-portal-flex.ts
+                  </span>
+                </div>
+                <div>
+                  <h3 className="font-bold text-sm text-foreground">การ์ดทางเข้า Mini App</h3>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    การ์ดเมนูรวมทางลัด สั่งซื้อ, สต็อก, สแกน POS สำหรับส่งในแชท LINE
+                  </p>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full rounded-xl text-xs gap-1.5 font-semibold text-[#06C755]"
+                  onClick={handlePreviewPortalFlex}
                 >
                   <Eye className="size-3.5" /> ดูตัวอย่าง Flex Message
                 </Button>
@@ -1097,48 +1191,47 @@ function SettingsPage() {
 
           {/* TAB 6: LINE API */}
           <TabsContent value="line" className="space-y-4">
-            <Card className="rounded-2xl border-emerald-500/30">
-              <CardHeader className="bg-emerald-600 text-white rounded-t-2xl p-4">
+            {/* Status Card */}
+            <Card className="rounded-2xl border-emerald-500/30 shadow-xs">
+              <CardHeader className="bg-[#06C755] text-white rounded-t-2xl p-4">
                 <CardTitle className="text-base flex items-center gap-2 text-white">
-                  <MessageSquare className="size-5" /> สถานะการเชื่อมต่อ LINE
+                  <MessageSquare className="size-5" /> สถานะการเชื่อมต่อ LINE Ecosystem
                 </CardTitle>
                 <CardDescription className="text-emerald-100 text-xs">
-                  LIFF, Mini App, และ Messaging API สำหรับส่งใบสั่งซื้อประจำวัน
+                  LINE Mini App, LIFF SDK, และ Messaging API Gateway
                 </CardDescription>
               </CardHeader>
               <CardContent className="p-4 space-y-4">
                 <Alert className="bg-muted/70 border-border/80 rounded-xl">
                   <ShieldCheck className="size-4 text-emerald-600" />
                   <AlertTitle className="text-xs font-semibold">
-                    Zero Secret Leakage Architecture
+                    Zero Secret Leakage & Direct LIFF SDK
                   </AlertTitle>
                   <AlertDescription className="text-xs text-muted-foreground">
-                    ไม่มีการฝังคีย์ลับหรือโทเค็นใดๆ ในโค้ด client-side ข้อมูลถูก inject ผ่าน
-                    server-side environment variables เท่านั้น
+                    เชื่อมต่อ LINE Official Account และ LINE Mini App โดยตรงผ่าน Server Environment
+                    Variables ปลอดภัย 100%
                   </AlertDescription>
                 </Alert>
 
                 <div className="grid gap-3 sm:grid-cols-2">
                   <div className="rounded-xl border p-3.5 space-y-2 bg-card">
                     <div className="flex items-center justify-between">
-                      <span className="font-semibold text-xs text-foreground">
-                        Client-side (LINE LIFF)
+                      <span className="font-semibold text-xs text-foreground flex items-center gap-1.5">
+                        <Smartphone className="size-4 text-[#06C755]" /> LINE Mini App / LIFF
                       </span>
                       {lineStatus?.hasLiffId ? (
-                        <Badge className="bg-emerald-600 text-white text-[10px]">
-                          เชื่อมต่อแล้ว
-                        </Badge>
+                        <Badge className="bg-[#06C755] text-white text-[10px]">เชื่อมต่อแล้ว</Badge>
                       ) : (
                         <Badge variant="outline" className="text-amber-600 text-[10px]">
-                          Fallback Web Share
+                          รอตั้งค่า LIFF ID
                         </Badge>
                       )}
                     </div>
                     <div className="text-xs text-muted-foreground space-y-1">
                       <div className="flex justify-between">
-                        <span>VITE_LINE_LIFF_ID:</span>
-                        <span className="font-mono text-foreground">
-                          {clientLiffId ? `${clientLiffId.substring(0, 8)}...` : "ยังไม่ได้ตั้งค่า"}
+                        <span>LINE_LIFF_ID:</span>
+                        <span className="font-mono font-bold text-foreground">
+                          {clientLiffId ? `${clientLiffId}` : "ยังไม่ได้ตั้งค่า"}
                         </span>
                       </div>
                     </div>
@@ -1146,11 +1239,11 @@ function SettingsPage() {
 
                   <div className="rounded-xl border p-3.5 space-y-2 bg-card">
                     <div className="flex items-center justify-between">
-                      <span className="font-semibold text-xs text-foreground">
-                        Server-side (Messaging API)
+                      <span className="font-semibold text-xs text-foreground flex items-center gap-1.5">
+                        <Bot className="size-4 text-[#06C755]" /> LINE Messaging API (Bot)
                       </span>
                       {serverLineConfig?.hasAccessToken ? (
-                        <Badge className="bg-emerald-600 text-white text-[10px]">พร้อมทำงาน</Badge>
+                        <Badge className="bg-[#06C755] text-white text-[10px]">พร้อมทำงาน</Badge>
                       ) : (
                         <Badge variant="outline" className="text-muted-foreground text-[10px]">
                           รอตั้งค่า
@@ -1168,6 +1261,243 @@ function SettingsPage() {
                       </div>
                     </div>
                   </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* CORE GATEWAY: LINE Messaging API as Mini App Portal Entrance */}
+            <Card className="rounded-2xl border-border/80 shadow-xs">
+              <CardHeader className="p-4 pb-2">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div>
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <Sparkles className="size-5 text-[#06C755]" /> LINE Messaging API ➔
+                      ทางเข้าหลัก LINE Mini App
+                    </CardTitle>
+                    <CardDescription className="text-xs">
+                      ใช้ LINE Official Account และ Messaging API ส่งการ์ดทางเข้าและตั้งค่า Rich
+                      Menu ให้ผู้ใช้แตะเปิด Mini App ได้ทันที
+                    </CardDescription>
+                  </div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-9 text-xs rounded-xl gap-1.5 font-semibold text-emerald-700 dark:text-emerald-300"
+                      onClick={handlePreviewPortalFlex}
+                    >
+                      <Eye className="size-3.5" /> ดูตัวอย่างการ์ด Flex ทางเข้า
+                    </Button>
+                    <Button
+                      size="sm"
+                      className="h-9 text-xs rounded-xl font-bold gap-1.5 bg-[#06C755] hover:bg-[#05b34c] text-white shadow-xs"
+                      onClick={() => handleSendPortalCard(followers[0]?.userId, false)}
+                      disabled={portalSending}
+                    >
+                      <Send className="size-3.5" />
+                      {portalSending ? "กำลังส่ง..." : "ทดสอบส่งการ์ดทางเข้าเข้า LINE"}
+                    </Button>
+                  </div>
+                </div>
+              </CardHeader>
+
+              <CardContent className="p-4 space-y-4">
+                {portalStatusMsg ? (
+                  <Alert
+                    className={`rounded-xl ${
+                      portalStatusMsg.type === "success"
+                        ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-900 dark:text-emerald-200"
+                        : "bg-destructive/10 border-destructive/20 text-destructive"
+                    }`}
+                  >
+                    {portalStatusMsg.type === "success" ? (
+                      <CheckCircle2 className="size-4 text-emerald-600" />
+                    ) : (
+                      <AlertCircle className="size-4 text-destructive" />
+                    )}
+                    <AlertTitle className="text-xs font-semibold">
+                      {portalStatusMsg.type === "success" ? "ส่งสำเร็จ" : "ข้อผิดพลาด"}
+                    </AlertTitle>
+                    <AlertDescription className="text-xs">{portalStatusMsg.text}</AlertDescription>
+                  </Alert>
+                ) : null}
+
+                {/* 1-Click Copy Links for Rich Menu & LINE OA */}
+                <div>
+                  <h3 className="text-xs font-bold text-foreground mb-2 flex items-center gap-1.5">
+                    <Smartphone className="size-4 text-[#06C755]" /> ลิงก์ทางเข้า Mini App แต่ละหน้า
+                    (สำหรับใส่ใน Rich Menu บน LINE Official Account Manager)
+                  </h3>
+                  <div className="grid gap-2.5 sm:grid-cols-2">
+                    {/* Link 1: Reorder */}
+                    <div className="rounded-xl border p-3 bg-muted/30 space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-xs text-foreground flex items-center gap-1">
+                          🛒 1. ทางเข้าหน้าสั่งซื้อสินค้า (Reorder)
+                        </span>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-7 text-[11px] gap-1 text-emerald-700 dark:text-emerald-300"
+                          onClick={() =>
+                            handleCopyLink(
+                              `https://liff.line.me/${clientLiffId || "2007000000-xxxxxx"}/reorder`,
+                              "reorder_link",
+                            )
+                          }
+                        >
+                          {copiedKey === "reorder_link" ? (
+                            <>
+                              <Check className="size-3 text-emerald-600" /> คัดลอกแล้ว
+                            </>
+                          ) : (
+                            <>
+                              <Copy className="size-3" /> คัดลอกลิงก์
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                      <div className="font-mono text-[11px] text-muted-foreground truncate bg-background p-2 rounded-lg border">
+                        https://liff.line.me/{clientLiffId || "2007000000-xxxxxx"}/reorder
+                      </div>
+                    </div>
+
+                    {/* Link 2: Stock */}
+                    <div className="rounded-xl border p-3 bg-muted/30 space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-xs text-foreground flex items-center gap-1">
+                          📦 2. ทางเข้าหน้าจัดการสต็อก (Stock)
+                        </span>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-7 text-[11px] gap-1 text-emerald-700 dark:text-emerald-300"
+                          onClick={() =>
+                            handleCopyLink(
+                              `https://liff.line.me/${clientLiffId || "2007000000-xxxxxx"}/stock`,
+                              "stock_link",
+                            )
+                          }
+                        >
+                          {copiedKey === "stock_link" ? (
+                            <>
+                              <Check className="size-3 text-emerald-600" /> คัดลอกแล้ว
+                            </>
+                          ) : (
+                            <>
+                              <Copy className="size-3" /> คัดลอกลิงก์
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                      <div className="font-mono text-[11px] text-muted-foreground truncate bg-background p-2 rounded-lg border">
+                        https://liff.line.me/{clientLiffId || "2007000000-xxxxxx"}/stock
+                      </div>
+                    </div>
+
+                    {/* Link 3: Scan */}
+                    <div className="rounded-xl border p-3 bg-muted/30 space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-xs text-foreground flex items-center gap-1">
+                          📷 3. ทางเข้าหน้าสแกนบาร์โค้ด (POS Scanner)
+                        </span>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-7 text-[11px] gap-1 text-emerald-700 dark:text-emerald-300"
+                          onClick={() =>
+                            handleCopyLink(
+                              `https://liff.line.me/${clientLiffId || "2007000000-xxxxxx"}/scan`,
+                              "scan_link",
+                            )
+                          }
+                        >
+                          {copiedKey === "scan_link" ? (
+                            <>
+                              <Check className="size-3 text-emerald-600" /> คัดลอกแล้ว
+                            </>
+                          ) : (
+                            <>
+                              <Copy className="size-3" /> คัดลอกลิงก์
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                      <div className="font-mono text-[11px] text-muted-foreground truncate bg-background p-2 rounded-lg border">
+                        https://liff.line.me/{clientLiffId || "2007000000-xxxxxx"}/scan
+                      </div>
+                    </div>
+
+                    {/* Link 4: Dashboard */}
+                    <div className="rounded-xl border p-3 bg-muted/30 space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-xs text-foreground flex items-center gap-1">
+                          📊 4. ทางเข้าหน้าแดชบอร์ดหลัก (Dashboard)
+                        </span>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-7 text-[11px] gap-1 text-emerald-700 dark:text-emerald-300"
+                          onClick={() =>
+                            handleCopyLink(
+                              `https://liff.line.me/${clientLiffId || "2007000000-xxxxxx"}`,
+                              "dashboard_link",
+                            )
+                          }
+                        >
+                          {copiedKey === "dashboard_link" ? (
+                            <>
+                              <Check className="size-3 text-emerald-600" /> คัดลอกแล้ว
+                            </>
+                          ) : (
+                            <>
+                              <Copy className="size-3" /> คัดลอกลิงก์
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                      <div className="font-mono text-[11px] text-muted-foreground truncate bg-background p-2 rounded-lg border">
+                        https://liff.line.me/{clientLiffId || "2007000000-xxxxxx"}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Steps to setup Rich Menu on manager.line.biz */}
+                <div className="p-3.5 rounded-xl border bg-emerald-500/5 border-emerald-500/20 space-y-2 text-xs">
+                  <div className="font-bold text-foreground flex items-center gap-1.5 text-emerald-800 dark:text-emerald-300">
+                    <Info className="size-4 text-[#06C755]" /> วิธีตั้งค่า Rich Menu ใน LINE
+                    Official Account Manager (ทำครั้งเดียว):
+                  </div>
+                  <ol className="list-decimal list-inside space-y-1 text-muted-foreground pl-1 leading-relaxed">
+                    <li>
+                      เปิดเว็บ{" "}
+                      <a
+                        href="https://manager.line.biz"
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-primary font-bold underline"
+                      >
+                        manager.line.biz
+                      </a>{" "}
+                      แล้วเข้าสู่ระบบบัญชี LINE Official Account ของร้าน
+                    </li>
+                    <li>
+                      ไปที่เมนูด้านซ้ายเลือก <strong>"ริชเมนู (Rich Menus)"</strong> ➔ กดปุ่ม{" "}
+                      <strong>"สร้างใหม่ (Create)"</strong>
+                    </li>
+                    <li>เลือกรูปแบบเทมเพลตปุ่ม (เช่น 4 ช่อง หรือ 6 ช่อง) และอัปโหลดภาพไอคอนเมนู</li>
+                    <li>
+                      ในช่องการกระทำ (Action) ให้เลือกประเภทเป็น <strong>"ลิงก์ (Link)"</strong>{" "}
+                      แล้วนำลิงก์ <code>https://liff.line.me/...</code>{" "}
+                      จากตารางด้านบนไปใส่ในแต่ละช่อง
+                    </li>
+                    <li>
+                      กด <strong>"บันทึกและเปิดใช้งาน (Save & Publish)"</strong> ➔
+                      เมื่อผู้ใช้เปิดแชท LINE OA จะเห็นเมนูด้านล่าง แตะแล้วเปิด Mini App
+                      เต็มจอทันที!
+                    </li>
+                  </ol>
                 </div>
               </CardContent>
             </Card>
