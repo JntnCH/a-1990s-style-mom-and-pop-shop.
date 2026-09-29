@@ -118,6 +118,8 @@ const globalServerDatabase: {
   ],
 };
 
+export const DEFAULT_LINE_LIFF_ID = "2011710264-gaZ7oEcK";
+
 export const getLineServerConfigFn = createServerFn({ method: "GET" }).handler(async () => {
   const envLiff = (
     process.env["LINE_LIFF_ID"] ||
@@ -128,7 +130,7 @@ export const getLineServerConfigFn = createServerFn({ method: "GET" }).handler(a
     process.env["VITE_LIFF_ID"] ||
     ""
   ).trim();
-  const validLiff = envLiff && envLiff !== "xxxxx-xxxxx" ? envLiff : undefined;
+  const validLiff = envLiff && envLiff !== "xxxxx-xxxxx" ? envLiff : DEFAULT_LINE_LIFF_ID;
 
   const hasAccessToken = Boolean(
     process.env["LINE_CHANNEL_ACCESS_TOKEN"] ||

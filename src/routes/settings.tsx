@@ -428,7 +428,9 @@ function SettingsPage() {
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
 
   // Local LIFF ID state for editing in Settings
-  const [editingLiffId, setEditingLiffId] = useState<string>(() => clientLiffId || "");
+  const [editingLiffId, setEditingLiffId] = useState<string>(
+    () => clientLiffId || "2011710264-gaZ7oEcK",
+  );
 
   const handleSaveLiffId = () => {
     const trimmed = editingLiffId.trim();

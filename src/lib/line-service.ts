@@ -29,7 +29,9 @@ export interface LineConfigStatus {
   error?: string | undefined;
 }
 
-let memoryLiffId: string | null = null;
+export const DEFAULT_LINE_LIFF_ID = "2011710264-gaZ7oEcK";
+
+let memoryLiffId: string | null = DEFAULT_LINE_LIFF_ID;
 
 // Retrieve LIFF ID from memory, URL params, localStorage, Vite env, or runtime config
 export function getClientLiffId(): string | null {
@@ -77,7 +79,7 @@ export function getClientLiffId(): string | null {
     memoryLiffId = id.trim();
     return memoryLiffId;
   }
-  return null;
+  return DEFAULT_LINE_LIFF_ID;
 }
 
 export function setClientLiffId(id: string): void {

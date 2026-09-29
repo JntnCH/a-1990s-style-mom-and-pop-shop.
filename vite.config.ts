@@ -26,5 +26,10 @@ export default defineConfig({
   },
   vite: {
     plugins: [],
+    define: {
+      "import.meta.env.VITE_LINE_LIFF_ID": JSON.stringify(
+        process.env["VITE_LINE_LIFF_ID"] || process.env["LINE_LIFF_ID"] || "2011710264-gaZ7oEcK",
+      ),
+    },
   },
 });
