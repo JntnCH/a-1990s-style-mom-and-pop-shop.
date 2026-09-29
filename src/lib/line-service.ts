@@ -134,7 +134,8 @@ export async function initLiff(): Promise<boolean> {
       const liff = liffMod.default;
       liffInstance = liff;
 
-      const initPromise = liff.init({ liffId }).then(() => true);
+      // CRITICAL: withLoginOnExternalBrowser MUST be false to prevent automatic redirection to access.line.me (400 Bad Request)
+      const initPromise = liff.init({ liffId, withLoginOnExternalBrowser: false }).then(() => true);
       const timeoutPromise = new Promise<boolean>((resolve) =>
         setTimeout(() => resolve(false), 3500),
       );
@@ -157,7 +158,7 @@ export async function initLiff(): Promise<boolean> {
 }
 
 /**
- * Gets current LIFF and LINE environment diagnostics.
+ * Gets current LIFF and LINE environment diagnostics safely without eager SDK init.
  */
 export async function getLineStatus(): Promise<LineConfigStatus> {
   try {
@@ -165,47 +166,45 @@ export async function getLineStatus(): Promise<LineConfigStatus> {
     if (!liffId) {
       return {
         hasLiffId: false,
-        liffIdDisplay: "ไม่ได้ตั้งค่า (รอ VITE_LINE_LIFF_ID)",
+        liffIdDisplay: "ไม่ได้ตั้งค่า (ดึงจาก GitHub Secrets)",
         isInClient: false,
         isLoggedIn: false,
       };
     }
 
-    const initialized = await initLiff();
-    if (!initialized || !liffInstance) {
+    if (liffInstance) {
+      const inClient =
+        typeof liffInstance.isInClient === "function" ? liffInstance.isInClient() : false;
+      const loggedIn =
+        typeof liffInstance.isLoggedIn === "function" ? liffInstance.isLoggedIn() : false;
+      let profileName: string | undefined;
+      let profilePicture: string | undefined;
+
+      if (loggedIn && typeof liffInstance.getProfile === "function") {
+        try {
+          const profile = await liffInstance.getProfile();
+          profileName = profile?.displayName;
+          profilePicture = profile?.pictureUrl;
+        } catch {
+          // Profile fetch optional
+        }
+      }
+
       return {
         hasLiffId: true,
         liffIdDisplay: `${liffId.slice(0, 4)}...${liffId.slice(-4)}`,
-        isInClient: false,
-        isLoggedIn: false,
-        error: "LIFF Init ไม่สำเร็จ หรือรหัส LIFF ID ไม่ถูกต้อง",
+        isInClient: inClient,
+        isLoggedIn: loggedIn,
+        profileName,
+        profilePicture,
       };
-    }
-
-    const inClient =
-      typeof liffInstance.isInClient === "function" ? liffInstance.isInClient() : false;
-    const loggedIn =
-      typeof liffInstance.isLoggedIn === "function" ? liffInstance.isLoggedIn() : false;
-    let profileName: string | undefined;
-    let profilePicture: string | undefined;
-
-    if (loggedIn && typeof liffInstance.getProfile === "function") {
-      try {
-        const profile = await liffInstance.getProfile();
-        profileName = profile?.displayName;
-        profilePicture = profile?.pictureUrl;
-      } catch {
-        // Profile fetch optional
-      }
     }
 
     return {
       hasLiffId: true,
       liffIdDisplay: `${liffId.slice(0, 4)}...${liffId.slice(-4)}`,
-      isInClient: inClient,
-      isLoggedIn: loggedIn,
-      profileName,
-      profilePicture,
+      isInClient: false,
+      isLoggedIn: false,
     };
   } catch (err) {
     return {
