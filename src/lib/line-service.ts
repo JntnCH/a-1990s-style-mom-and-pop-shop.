@@ -337,19 +337,17 @@ export async function shareFlexViaLiffPicker(
   const isLoggedIn =
     typeof liffInstance.isLoggedIn === "function" ? liffInstance.isLoggedIn() : false;
 
+  // If outside LINE and not logged in, prompt LINE login ONLY upon explicit user click
   if (!isLoggedIn && !inClient) {
-    return {
-      success: false,
-      message:
-        "การเปิดรายชื่อเพื่อน (LINE Share Target Picker) ต้องเปิดใช้งานผ่านแอป LINE หรือเลือกผู้รับจากรายชื่อซัพพลายเออร์ในระบบด้านล่างเพื่อส่ง Flex Message ทันที",
-    };
-  }
-
-  if (!liffInstance.isApiAvailable("shareTargetPicker")) {
-    return {
-      success: false,
-      message: "LIFF App นี้ยังไม่ได้เปิดฟังก์ชัน Share Target Picker ใน LINE Developers Console",
-    };
+    try {
+      liffInstance.login({ redirectUri: window.location.href });
+      return { success: false, message: "กำลังเปิดหน้าเข้าสู่ระบบ LINE..." };
+    } catch {
+      return {
+        success: false,
+        message: "กรุณาเปิดหน้านี้ผ่านแอป LINE เพื่อเลือกเพื่อนส่ง Flex Message",
+      };
+    }
   }
 
   try {
@@ -377,14 +375,28 @@ export async function shareFlexViaLiffPicker(
       messagePayload = { type: "text", text: altSummary };
     }
 
-    const res = await liffInstance.shareTargetPicker([messagePayload]);
-    if (res) {
-      return {
-        success: true,
-        message: "ส่ง LINE Flex Message ไปยังเพื่อน/กลุ่มที่เลือกสำเร็จแล้ว",
-      };
+    if (
+      typeof liffInstance.isApiAvailable === "function" &&
+      !liffInstance.isApiAvailable("shareTargetPicker")
+    ) {
+      console.warn("isApiAvailable('shareTargetPicker') returned false, attempting direct call...");
     }
-    return { success: false, message: "ยกเลิกการเลือกห้องแชทใน LINE" };
+
+    if (typeof liffInstance.shareTargetPicker === "function") {
+      const res = await liffInstance.shareTargetPicker([messagePayload]);
+      if (res) {
+        return {
+          success: true,
+          message: "ส่ง LINE Flex Message ไปยังเพื่อน/กลุ่มที่เลือกสำเร็จแล้ว",
+        };
+      }
+      return { success: false, message: "ยกเลิกการเลือกห้องแชทใน LINE" };
+    }
+
+    return {
+      success: false,
+      message: "ไม่พบฟังก์ชัน Share Target Picker ใน LINE LIFF SDK",
+    };
   } catch (err: unknown) {
     const errMsg = err instanceof Error ? err.message : String(err);
     return { success: false, message: `เกิดข้อผิดพลาดจาก LINE: ${errMsg}` };
