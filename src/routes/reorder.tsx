@@ -283,7 +283,9 @@ function ReorderPage() {
 
   useEffect(() => {
     reloadData();
-    getLineStatus().then(setLineStatus);
+    getLineStatus()
+      .then(setLineStatus)
+      .catch(() => setLineStatus(null));
     getLineServerConfigFn()
       .then((cfg) => {
         setServerConfig(cfg);

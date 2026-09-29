@@ -133,8 +133,20 @@ export async function initLiff(): Promise<boolean> {
       const liffMod = await import("@line/liff");
       const liff = liffMod.default;
       liffInstance = liff;
-      await liff.init({ liffId });
-      return true;
+
+      const initPromise = liff.init({ liffId }).then(() => true);
+      const timeoutPromise = new Promise<boolean>((resolve) =>
+        setTimeout(() => resolve(false), 3500),
+      );
+
+      const res = await Promise.race([
+        initPromise.catch((err) => {
+          console.warn("LIFF initialization note:", err);
+          return false;
+        }),
+        timeoutPromise,
+      ]);
+      return res;
     } catch (err) {
       console.warn("LIFF initialization note:", err);
       return false;
@@ -148,50 +160,62 @@ export async function initLiff(): Promise<boolean> {
  * Gets current LIFF and LINE environment diagnostics.
  */
 export async function getLineStatus(): Promise<LineConfigStatus> {
-  const liffId = getClientLiffId();
-  if (!liffId) {
-    return {
-      hasLiffId: false,
-      liffIdDisplay: "ไม่ได้ตั้งค่า (รอ VITE_LINE_LIFF_ID)",
-      isInClient: false,
-      isLoggedIn: false,
-    };
-  }
+  try {
+    const liffId = getClientLiffId();
+    if (!liffId) {
+      return {
+        hasLiffId: false,
+        liffIdDisplay: "ไม่ได้ตั้งค่า (รอ VITE_LINE_LIFF_ID)",
+        isInClient: false,
+        isLoggedIn: false,
+      };
+    }
 
-  const initialized = await initLiff();
-  if (!initialized || !liffInstance) {
+    const initialized = await initLiff();
+    if (!initialized || !liffInstance) {
+      return {
+        hasLiffId: true,
+        liffIdDisplay: `${liffId.slice(0, 4)}...${liffId.slice(-4)}`,
+        isInClient: false,
+        isLoggedIn: false,
+        error: "LIFF Init ไม่สำเร็จ หรือรหัส LIFF ID ไม่ถูกต้อง",
+      };
+    }
+
+    const inClient =
+      typeof liffInstance.isInClient === "function" ? liffInstance.isInClient() : false;
+    const loggedIn =
+      typeof liffInstance.isLoggedIn === "function" ? liffInstance.isLoggedIn() : false;
+    let profileName: string | undefined;
+    let profilePicture: string | undefined;
+
+    if (loggedIn && typeof liffInstance.getProfile === "function") {
+      try {
+        const profile = await liffInstance.getProfile();
+        profileName = profile?.displayName;
+        profilePicture = profile?.pictureUrl;
+      } catch {
+        // Profile fetch optional
+      }
+    }
+
     return {
       hasLiffId: true,
       liffIdDisplay: `${liffId.slice(0, 4)}...${liffId.slice(-4)}`,
+      isInClient: inClient,
+      isLoggedIn: loggedIn,
+      profileName,
+      profilePicture,
+    };
+  } catch (err) {
+    return {
+      hasLiffId: false,
+      liffIdDisplay: "เกิดข้อผิดพลาด",
       isInClient: false,
       isLoggedIn: false,
-      error: "LIFF Init ไม่สำเร็จ หรือรหัส LIFF ID ไม่ถูกต้อง",
+      error: String(err),
     };
   }
-
-  const inClient = liffInstance.isInClient();
-  const loggedIn = liffInstance.isLoggedIn();
-  let profileName: string | undefined;
-  let profilePicture: string | undefined;
-
-  if (loggedIn) {
-    try {
-      const profile = await liffInstance.getProfile();
-      profileName = profile.displayName;
-      profilePicture = profile.pictureUrl;
-    } catch {
-      // Profile fetch optional
-    }
-  }
-
-  return {
-    hasLiffId: true,
-    liffIdDisplay: `${liffId.slice(0, 4)}...${liffId.slice(-4)}`,
-    isInClient: inClient,
-    isLoggedIn: loggedIn,
-    profileName,
-    profilePicture,
-  };
 }
 
 /**
@@ -309,16 +333,17 @@ export async function shareFlexViaLiffPicker(
     };
   }
 
-  if (!liffInstance.isLoggedIn()) {
-    try {
-      liffInstance.login();
-      return { success: false, message: "กำลังเปิดหน้าเข้าสู่ระบบ LINE..." };
-    } catch {
-      return {
-        success: false,
-        message: "กรุณาเปิดหน้านี้ผ่านแอป LINE เพื่อเลือกเพื่อนส่ง Flex Message",
-      };
-    }
+  const inClient =
+    typeof liffInstance.isInClient === "function" ? liffInstance.isInClient() : false;
+  const isLoggedIn =
+    typeof liffInstance.isLoggedIn === "function" ? liffInstance.isLoggedIn() : false;
+
+  if (!isLoggedIn && !inClient) {
+    return {
+      success: false,
+      message:
+        "การเปิดรายชื่อเพื่อน (LINE Share Target Picker) ต้องเปิดใช้งานผ่านแอป LINE หรือเลือกผู้รับจากรายชื่อซัพพลายเออร์ในระบบด้านล่างเพื่อส่ง Flex Message ทันที",
+    };
   }
 
   if (!liffInstance.isApiAvailable("shareTargetPicker")) {
