@@ -293,10 +293,9 @@ export async function shareFlexViaLiffPicker(
   success: boolean;
   message: string;
   needLiffId?: boolean;
-  canFallbackNativeApp?: boolean;
 }> {
   if (typeof window === "undefined") {
-    return { success: false, message: "ทำงานบนเบราว์เซอร์เท่านั้น", canFallbackNativeApp: false };
+    return { success: false, message: "ทำงานบนเบราว์เซอร์เท่านั้น" };
   }
 
   let liffId = getClientLiffId();
@@ -316,8 +315,7 @@ export async function shareFlexViaLiffPicker(
     return {
       success: false,
       needLiffId: true,
-      canFallbackNativeApp: true,
-      message: "ไม่พบคีย์ LINE_LIFF_ID ระบบจะเปิดแอป LINE ให้โดยตรง",
+      message: "ยังไม่ได้ระบุ LINE LIFF ID กรุณาใส่ LIFF ID ของท่านเพื่อเปิดรายชื่อเพื่อน",
     };
   }
 
@@ -325,8 +323,8 @@ export async function shareFlexViaLiffPicker(
   if (!initialized || !liffInstance) {
     return {
       success: false,
-      canFallbackNativeApp: true,
-      message: `ไม่สามารถเริ่มต้น LINE LIFF SDK ได้ (${liffId}) ระบบจะเปิดแอป LINE ให้โดยตรง`,
+      needLiffId: true,
+      message: `ไม่สามารถเริ่มต้น LINE LIFF SDK ได้ (${liffId}) กรุณาตรวจสอบว่ากรอก LIFF ID ถูกต้อง`,
     };
   }
 
@@ -374,13 +372,11 @@ export async function shareFlexViaLiffPicker(
       return {
         success: false,
         message: "ยกเลิกการเลือกห้องแชทใน LINE",
-        canFallbackNativeApp: false,
       };
     }
 
     return {
       success: false,
-      canFallbackNativeApp: true,
       message: "ไม่พบฟังก์ชัน Share Target Picker ใน LINE LIFF SDK",
     };
   } catch (err: unknown) {
@@ -393,12 +389,11 @@ export async function shareFlexViaLiffPicker(
     ) {
       return {
         success: false,
-        canFallbackNativeApp: true,
         message:
-          "ยังไม่ได้เปิดฟังก์ชัน Share Target Picker หรือเปิดนอกแอป LINE ระบบจะเปิดแอป LINE ให้โดยตรง",
+          "ยังไม่ได้เปิดฟังก์ชัน Share Target Picker ใน LINE Developers Console (กรุณาเปิด Share Target Picker เป็น ON ในแท็บ LIFF)",
       };
     }
-    return { success: false, canFallbackNativeApp: true, message: `LINE Note: ${errMsg}` };
+    return { success: false, message: `LINE Note: ${errMsg}` };
   }
 }
 

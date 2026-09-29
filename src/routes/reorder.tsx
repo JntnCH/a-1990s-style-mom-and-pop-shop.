@@ -246,6 +246,10 @@ function ReorderPage() {
     hasAccessToken: boolean;
   } | null>(null);
 
+  // LINE LIFF ID Setup Modal State (for 1-click Friend Picker)
+  const [liffIdModalOpen, setLiffIdModalOpen] = useState(false);
+  const [liffIdInputValue, setLiffIdInputValue] = useState("");
+
   const reloadData = useCallback(() => {
     const allProds = MasterStore.getProducts();
     const allCats = MasterStore.getCategories();
@@ -517,7 +521,7 @@ function ReorderPage() {
   const totalQuantity = fullItems.reduce((acc, curr) => acc + curr.quantity, 0);
 
   // Phase 6 Action: Save Purchase Order Record
-  const handleSavePO = (status: "DRAFT" | "ORDERED") => {
+  const handleSavePO = (status: "DRAFT" | "ORDERED", switchTab: boolean = true) => {
     if (fullItems.length === 0) return undefined;
 
     const poRecord = MasterStore.savePurchaseOrder({
@@ -547,7 +551,9 @@ function ReorderPage() {
         status === "ORDERED" ? "สั่งซื้อแล้ว" : "ฉบับร่าง"
       }) เรียบร้อยแล้ว`,
     });
-    setActiveTab("po_history");
+    if (switchTab) {
+      setActiveTab("po_history");
+    }
     return poRecord;
   };
 
@@ -627,12 +633,18 @@ function ReorderPage() {
       toast.error("ไม่มีรายการสินค้าในใบสั่งซื้อ");
       return;
     }
+    setPushMessageType("PURCHASE_ORDER");
     if (target === "personal") {
+      const currentLiffId = getClientLiffId();
+      if (!currentLiffId) {
+        setLiffIdInputValue("");
+        setLiffIdModalOpen(true);
+        return;
+      }
       // 1-Click Direct Native LINE Friends Picker without another modal page
       handleOpenLiffTargetPicker("PURCHASE_ORDER");
       return;
     }
-    setPushMessageType("PURCHASE_ORDER");
     setIsBroadcastMode(false);
     setRecipientFilterTab("GROUPS");
     const groupTarget = followers.find(
@@ -652,12 +664,18 @@ function ReorderPage() {
       toast.error("ไม่มีรายการสินค้าที่ต้องแจ้งเตือนสต็อก");
       return;
     }
+    setPushMessageType("STOCK_ALERT");
     if (target === "personal") {
+      const currentLiffId = getClientLiffId();
+      if (!currentLiffId) {
+        setLiffIdInputValue("");
+        setLiffIdModalOpen(true);
+        return;
+      }
       // 1-Click Direct Native LINE Friends Picker without another modal page
       handleOpenLiffTargetPicker("STOCK_ALERT");
       return;
     }
-    setPushMessageType("STOCK_ALERT");
     setIsBroadcastMode(false);
     setRecipientFilterTab("GROUPS");
     const groupTarget = followers.find(
@@ -738,6 +756,21 @@ function ReorderPage() {
     });
   };
 
+  const handleSaveLiffIdAndOpenPicker = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    const id = liffIdInputValue.trim();
+    if (!id) {
+      toast.error("กรุณาระบุ LINE LIFF ID (เช่น 200xxxxxxx-xxxxxxxx)");
+      return;
+    }
+    setClientLiffId(id);
+    setLiffIdModalOpen(false);
+    toast.success("บันทึก LINE LIFF ID สำเร็จ กำลังเปิดรายชื่อเพื่อน...");
+    setTimeout(() => {
+      handleOpenLiffTargetPicker(pushMessageType);
+    }, 150);
+  };
+
   // Open Native LINE Contact Picker (shareTargetPicker)
   const handleOpenLiffTargetPicker = async (overrideType?: "PURCHASE_ORDER" | "STOCK_ALERT") => {
     const msgType = overrideType || pushMessageType;
@@ -759,13 +792,8 @@ function ReorderPage() {
 
       if (!liffId) {
         setIsSending(false);
-        const errMsg =
-          "ไม่พบคีย์ LINE LIFF ID ใน GitHub Secrets หรือ Server Environment (ระบบดึงคีย์อัตโนมัติ ไม่มีการให้กรอกคีย์บนหน้าเว็บ กรุณาตรวจสอบการตั้งค่าคีย์ใน GitHub Secrets)";
-        setStatusMessage({
-          type: "error",
-          text: errMsg,
-        });
-        toast.error(errMsg);
+        setLiffIdInputValue("");
+        setLiffIdModalOpen(true);
         return;
       }
 
@@ -798,7 +826,7 @@ function ReorderPage() {
       if (res.success) {
         playScanSuccessSound({ force: true });
         if (msgType === "PURCHASE_ORDER") {
-          handleSavePO("ORDERED");
+          handleSavePO("ORDERED", false);
         }
         setStatusMessage({
           type: "success",
@@ -806,20 +834,9 @@ function ReorderPage() {
         });
         toast.success("ส่ง LINE Flex Message ไปยังห้องแชทสำเร็จแล้ว");
         setPushModalOpen(false);
-      } else if (res.canFallbackNativeApp) {
-        // Fallback to Native LINE App Share Picker (Wakes up LINE app & shows contact list)
-        playScanSuccessSound({ force: true });
-        if (msgType === "PURCHASE_ORDER") {
-          handleSavePO("ORDERED");
-        }
-        const url = `https://line.me/R/share?text=${encodeURIComponent(plainText)}`;
-        window.open(url, "_blank");
-        setStatusMessage({
-          type: "success",
-          text: "เปิดหน้าต่างเลือกเพื่อนในแอป LINE ให้เรียบร้อยแล้ว",
-        });
-        toast.success("เปิดหน้าต่างเลือกเพื่อนใน LINE เรียบร้อยแล้ว");
-        setPushModalOpen(false);
+      } else if (res.needLiffId) {
+        setLiffIdInputValue("");
+        setLiffIdModalOpen(true);
       } else {
         setStatusMessage({
           type: "error",
@@ -3308,6 +3325,57 @@ function ReorderPage() {
         onOpenChange={setExportModalOpen}
         payload={exportPayload}
       />
+
+      {/* LINE LIFF ID SETUP MODAL (FOR 1-CLICK FRIEND PICKER) */}
+      <Dialog open={liffIdModalOpen} onOpenChange={setLiffIdModalOpen}>
+        <DialogContent className="max-w-md rounded-2xl p-5">
+          <DialogHeader>
+            <DialogTitle className="text-base font-bold flex items-center gap-2 text-foreground">
+              <Smartphone className="size-5 text-[#06C755]" />
+              ระบุ LINE LIFF ID เพื่อเปิดรายชื่อเพื่อน
+            </DialogTitle>
+            <DialogDescription className="text-xs text-muted-foreground leading-relaxed">
+              ฟังก์ชันเปิดรายชื่อเพื่อนในแอป LINE (Share Target Picker) ต้องใช้{" "}
+              <strong>LIFF ID</strong> จาก LINE Developers Console เพื่อเปิดแผ่นเลือกเพื่อนส่ง Flex
+              Message
+            </DialogDescription>
+          </DialogHeader>
+
+          <form onSubmit={handleSaveLiffIdAndOpenPicker} className="space-y-4 pt-2">
+            <div className="space-y-2">
+              <Label className="text-xs font-semibold text-foreground">LINE LIFF ID ของท่าน:</Label>
+              <Input
+                placeholder="200xxxxxxx-xxxxxxxx"
+                value={liffIdInputValue}
+                onChange={(e) => setLiffIdInputValue(e.target.value)}
+                className="h-10 font-mono text-sm rounded-xl"
+                autoFocus
+              />
+              <p className="text-[11px] text-muted-foreground leading-relaxed">
+                * คัดลอกจาก LINE Developers Console &gt; Channel ของท่าน &gt; แท็บ LIFF &gt; LIFF ID
+                (และต้องเปิดสวิตช์ <strong>Share Target Picker: ON</strong> ด้วยครับ)
+              </p>
+            </div>
+
+            <DialogFooter className="pt-2 flex flex-col sm:flex-row gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                className="rounded-xl text-xs"
+                onClick={() => setLiffIdModalOpen(false)}
+              >
+                ยกเลิก
+              </Button>
+              <Button
+                type="submit"
+                className="rounded-xl text-xs font-bold bg-[#06C755] hover:bg-[#05b34c] text-white gap-1.5 shadow-sm"
+              >
+                <Users className="size-4" /> บันทึกและเปิดรายชื่อเพื่อนทันที
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

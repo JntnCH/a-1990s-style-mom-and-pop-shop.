@@ -78,7 +78,13 @@ import {
   sendMiniAppPortalCardFn,
   syncMasterDatabaseFn,
 } from "@/lib/line-server-fn";
-import { getClientLiffId, getLineStatus, type LineConfigStatus } from "@/lib/line-service";
+import {
+  getClientLiffId,
+  getLineStatus,
+  setClientLiffId,
+  shareFlexViaLiffPicker,
+  type LineConfigStatus,
+} from "@/lib/line-service";
 import {
   MasterStore,
   type CategoryItem,
@@ -420,6 +426,38 @@ function SettingsPage() {
     text: string;
   } | null>(null);
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
+
+  // Local LIFF ID state for editing in Settings
+  const [editingLiffId, setEditingLiffId] = useState<string>(() => clientLiffId || "");
+
+  const handleSaveLiffId = () => {
+    const trimmed = editingLiffId.trim();
+    if (!trimmed) {
+      toast.error("กรุณาระบุ LINE LIFF ID");
+      return;
+    }
+    setClientLiffId(trimmed);
+    setClientLiffIdState(trimmed);
+    toast.success("บันทึก LINE LIFF ID สำเร็จ");
+  };
+
+  const handleTestOpenLiffPicker = async () => {
+    const liffId = clientLiffId || editingLiffId.trim();
+    if (!liffId) {
+      toast.error("กรุณาระบุและบันทึก LINE LIFF ID ก่อนทดสอบ");
+      return;
+    }
+    const bubble = createMiniAppPortalFlexBubble({
+      storeName: "ร้าน MiniMark",
+      liffId,
+    });
+    const res = await shareFlexViaLiffPicker(bubble, "ทดสอบส่งการ์ด Flex Message ผ่าน LIFF");
+    if (res.success) {
+      toast.success("ส่ง LINE Flex Message สำเร็จเรียบร้อย");
+    } else {
+      toast.error(res.message);
+    }
+  };
 
   const handleCopyLink = (text: string, key: string) => {
     if (typeof navigator !== "undefined" && navigator.clipboard) {
@@ -1214,12 +1252,12 @@ function SettingsPage() {
                 </Alert>
 
                 <div className="grid gap-3 sm:grid-cols-2">
-                  <div className="rounded-xl border p-3.5 space-y-2 bg-card">
+                  <div className="rounded-xl border p-3.5 space-y-3 bg-card">
                     <div className="flex items-center justify-between">
                       <span className="font-semibold text-xs text-foreground flex items-center gap-1.5">
                         <Smartphone className="size-4 text-[#06C755]" /> LINE Mini App / LIFF
                       </span>
-                      {lineStatus?.hasLiffId ? (
+                      {clientLiffId || lineStatus?.hasLiffId ? (
                         <Badge className="bg-[#06C755] text-white text-[10px]">เชื่อมต่อแล้ว</Badge>
                       ) : (
                         <Badge variant="outline" className="text-amber-600 text-[10px]">
@@ -1227,13 +1265,30 @@ function SettingsPage() {
                         </Badge>
                       )}
                     </div>
-                    <div className="text-xs text-muted-foreground space-y-1">
-                      <div className="flex justify-between">
-                        <span>LINE_LIFF_ID:</span>
-                        <span className="font-mono font-bold text-foreground">
-                          {clientLiffId ? `${clientLiffId}` : "ยังไม่ได้ตั้งค่า"}
-                        </span>
+                    <div className="space-y-2">
+                      <div className="flex gap-2">
+                        <Input
+                          placeholder="200xxxxxxx-xxxxxxxx"
+                          value={editingLiffId}
+                          onChange={(e) => setEditingLiffId(e.target.value)}
+                          className="h-8 font-mono text-xs rounded-lg"
+                        />
+                        <Button
+                          size="sm"
+                          onClick={handleSaveLiffId}
+                          className="h-8 text-xs font-bold rounded-lg px-3 bg-[#06C755] hover:bg-[#05b34c] text-white shrink-0"
+                        >
+                          บันทึก
+                        </Button>
                       </div>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={handleTestOpenLiffPicker}
+                        className="w-full h-8 text-[11px] rounded-lg font-semibold gap-1 text-[#06C755] border-[#06C755]/30 hover:bg-emerald-50 dark:hover:bg-emerald-950/20"
+                      >
+                        <Users className="size-3.5" /> ทดสอบเปิดรายชื่อเพื่อน (LIFF Picker)
+                      </Button>
                     </div>
                   </div>
 
