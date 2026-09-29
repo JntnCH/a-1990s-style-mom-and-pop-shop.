@@ -627,25 +627,27 @@ function ReorderPage() {
     window.print();
   };
 
-  // Send Order to LINE - opens recipient & friend selection modal or opens LINE Picker directly
+  // Send Order to LINE - opens recipient & friend selection modal
   const handleSendOrderToLine = (target: "group" | "personal") => {
     if (fullItems.length === 0) {
       toast.error("ไม่มีรายการสินค้าในใบสั่งซื้อ");
       return;
     }
     setPushMessageType("PURCHASE_ORDER");
+    setIsBroadcastMode(false);
     if (target === "personal") {
-      const currentLiffId = getClientLiffId();
-      if (!currentLiffId) {
-        setLiffIdInputValue("");
-        setLiffIdModalOpen(true);
-        return;
+      setRecipientFilterTab("USERS");
+      const personalTarget = followers.find(
+        (f) => !f.userId.startsWith("C") && f.role !== "viewer",
+      );
+      if (personalTarget) {
+        setTargetIdInput(personalTarget.userId);
+      } else if (followers.length > 0 && followers[0]) {
+        setTargetIdInput(followers[0].userId);
       }
-      // 1-Click Direct Native LINE Friends Picker without another modal page
-      handleOpenLiffTargetPicker("PURCHASE_ORDER");
+      setPushModalOpen(true);
       return;
     }
-    setIsBroadcastMode(false);
     setRecipientFilterTab("GROUPS");
     const groupTarget = followers.find(
       (f) => f.userId.startsWith("C") || f.role === "viewer" || f.displayName.includes("กลุ่ม"),
@@ -658,25 +660,27 @@ function ReorderPage() {
     setPushModalOpen(true);
   };
 
-  // Send Stock Alert to LINE - opens recipient & friend selection modal or opens LINE Picker directly
+  // Send Stock Alert to LINE - opens recipient & friend selection modal
   const handleSendStockAlertToLine = (target: "group" | "personal") => {
     if (allReorderNeeded.length === 0) {
       toast.error("ไม่มีรายการสินค้าที่ต้องแจ้งเตือนสต็อก");
       return;
     }
     setPushMessageType("STOCK_ALERT");
+    setIsBroadcastMode(false);
     if (target === "personal") {
-      const currentLiffId = getClientLiffId();
-      if (!currentLiffId) {
-        setLiffIdInputValue("");
-        setLiffIdModalOpen(true);
-        return;
+      setRecipientFilterTab("USERS");
+      const personalTarget = followers.find(
+        (f) => !f.userId.startsWith("C") && f.role !== "viewer",
+      );
+      if (personalTarget) {
+        setTargetIdInput(personalTarget.userId);
+      } else if (followers.length > 0 && followers[0]) {
+        setTargetIdInput(followers[0].userId);
       }
-      // 1-Click Direct Native LINE Friends Picker without another modal page
-      handleOpenLiffTargetPicker("STOCK_ALERT");
+      setPushModalOpen(true);
       return;
     }
-    setIsBroadcastMode(false);
     setRecipientFilterTab("GROUPS");
     const groupTarget = followers.find(
       (f) => f.userId.startsWith("C") || f.role === "viewer" || f.displayName.includes("กลุ่ม"),

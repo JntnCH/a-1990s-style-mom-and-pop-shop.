@@ -363,6 +363,23 @@ export async function shareFlexViaLiffPicker(
       messagePayload = { type: "text", text: altSummary };
     }
 
+    // Diagnostic check for API availability in this environment
+    const isApiAvailable =
+      typeof liffInstance.isApiAvailable === "function"
+        ? liffInstance.isApiAvailable("shareTargetPicker")
+        : true;
+
+    if (!isApiAvailable) {
+      console.warn("[LIFF] shareTargetPicker is reported as not available by LINE SDK");
+    }
+
+    if (typeof liffInstance.isLoggedIn === "function" && !liffInstance.isLoggedIn()) {
+      return {
+        success: false,
+        message: "ระบบเปิดในโหมดเว็บภายนอก กรุณาเลือกผู้รับจากรายชื่อในระบบ หรือเปิดผ่านลิงก์ LIFF",
+      };
+    }
+
     if (typeof liffInstance.shareTargetPicker === "function") {
       const res = await liffInstance.shareTargetPicker([messagePayload]);
       if (res) {
@@ -383,19 +400,11 @@ export async function shareFlexViaLiffPicker(
     };
   } catch (err: unknown) {
     const errMsg = err instanceof Error ? err.message : String(err);
-    if (
-      errMsg.toLowerCase().includes("permission") ||
-      errMsg.toLowerCase().includes("not available") ||
-      errMsg.toLowerCase().includes("api") ||
-      errMsg.toLowerCase().includes("login")
-    ) {
-      return {
-        success: false,
-        message:
-          "ยังไม่ได้เปิดฟังก์ชัน Share Target Picker ใน LINE Developers Console (กรุณาเปิด Share Target Picker เป็น ON ในแท็บ LIFF)",
-      };
-    }
-    return { success: false, message: `LINE Note: ${errMsg}` };
+    console.error("[LIFF shareTargetPicker error]", err);
+    return {
+      success: false,
+      message: `LINE Share Target Picker (${errMsg}): กรุณาตรวจสอบว่าเปิด Share Target Picker: ON และปิด-เปิดแอป LINE ใหม่อีกครั้ง`,
+    };
   }
 }
 

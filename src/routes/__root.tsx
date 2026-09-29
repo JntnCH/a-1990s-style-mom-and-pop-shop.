@@ -12,6 +12,7 @@ import { useEffect, type ReactNode } from "react";
 import appCss from "../styles.css?url";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Toaster } from "@/components/ui/sonner";
+import { initLiff } from "@/lib/line-service";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 
 function NotFoundComponent() {
@@ -125,6 +126,11 @@ function RootShell({ children }: { children: ReactNode }) {
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
+
+  useEffect(() => {
+    // Eagerly pre-warm LINE LIFF SDK on app load so shareTargetPicker works with instant user gesture
+    initLiff().catch(() => {});
+  }, []);
 
   return (
     <QueryClientProvider client={queryClient}>
