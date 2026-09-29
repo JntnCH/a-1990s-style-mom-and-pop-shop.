@@ -324,24 +324,6 @@ export async function shareFlexViaLiffPicker(
     };
   }
 
-  const inClient =
-    typeof liffInstance.isInClient === "function" ? liffInstance.isInClient() : false;
-  const isLoggedIn =
-    typeof liffInstance.isLoggedIn === "function" ? liffInstance.isLoggedIn() : false;
-
-  // If outside LINE and not logged in, prompt LINE login ONLY upon explicit user click
-  if (!isLoggedIn && !inClient) {
-    try {
-      liffInstance.login({ redirectUri: window.location.href });
-      return { success: false, message: "กำลังเปิดหน้าเข้าสู่ระบบ LINE..." };
-    } catch {
-      return {
-        success: false,
-        message: "กรุณาเปิดหน้านี้ผ่านแอป LINE เพื่อเลือกเพื่อนส่ง Flex Message",
-      };
-    }
-  }
-
   try {
     let messagePayload: Record<string, unknown>;
     if (flexMessage && typeof flexMessage === "object") {
