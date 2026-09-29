@@ -806,6 +806,20 @@ function ReorderPage() {
         });
         toast.success("ส่ง LINE Flex Message ไปยังห้องแชทสำเร็จแล้ว");
         setPushModalOpen(false);
+      } else if (res.canFallbackNativeApp) {
+        // Fallback to Native LINE App Share Picker (Wakes up LINE app & shows contact list)
+        playScanSuccessSound({ force: true });
+        if (msgType === "PURCHASE_ORDER") {
+          handleSavePO("ORDERED");
+        }
+        const url = `https://line.me/R/share?text=${encodeURIComponent(plainText)}`;
+        window.open(url, "_blank");
+        setStatusMessage({
+          type: "success",
+          text: "เปิดหน้าต่างเลือกเพื่อนในแอป LINE ให้เรียบร้อยแล้ว",
+        });
+        toast.success("เปิดหน้าต่างเลือกเพื่อนใน LINE เรียบร้อยแล้ว");
+        setPushModalOpen(false);
       } else {
         setStatusMessage({
           type: "error",

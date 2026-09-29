@@ -289,9 +289,14 @@ export interface LineShareResult {
 export async function shareFlexViaLiffPicker(
   flexMessage: unknown,
   altSummary: string = "รายการสั่งซื้อสินค้า MiniMark",
-): Promise<{ success: boolean; message: string; needLiffId?: boolean }> {
+): Promise<{
+  success: boolean;
+  message: string;
+  needLiffId?: boolean;
+  canFallbackNativeApp?: boolean;
+}> {
   if (typeof window === "undefined") {
-    return { success: false, message: "ทำงานบนเบราว์เซอร์เท่านั้น" };
+    return { success: false, message: "ทำงานบนเบราว์เซอร์เท่านั้น", canFallbackNativeApp: false };
   }
 
   let liffId = getClientLiffId();
@@ -310,9 +315,9 @@ export async function shareFlexViaLiffPicker(
   if (!liffId) {
     return {
       success: false,
-      needLiffId: false,
-      message:
-        "ไม่พบคีย์ LINE_LIFF_ID ใน GitHub Secrets หรือ Server Environment (ระบบดึงคีย์อัตโนมัติ ไม่มีการให้กรอกคีย์บนหน้าเว็บ กรุณาตรวจสอบการตั้งค่าคีย์ใน GitHub Secrets)",
+      needLiffId: true,
+      canFallbackNativeApp: true,
+      message: "ไม่พบคีย์ LINE_LIFF_ID ระบบจะเปิดแอป LINE ให้โดยตรง",
     };
   }
 
@@ -320,7 +325,8 @@ export async function shareFlexViaLiffPicker(
   if (!initialized || !liffInstance) {
     return {
       success: false,
-      message: `ไม่สามารถเริ่มต้น LINE LIFF SDK ได้ (${liffId}) กรุณาตรวจสอบ LIFF ID`,
+      canFallbackNativeApp: true,
+      message: `ไม่สามารถเริ่มต้น LINE LIFF SDK ได้ (${liffId}) ระบบจะเปิดแอป LINE ให้โดยตรง`,
     };
   }
 
@@ -365,11 +371,16 @@ export async function shareFlexViaLiffPicker(
           message: "ส่ง LINE Flex Message ไปยังเพื่อน/กลุ่มที่เลือกสำเร็จแล้ว",
         };
       }
-      return { success: false, message: "ยกเลิกการเลือกห้องแชทใน LINE" };
+      return {
+        success: false,
+        message: "ยกเลิกการเลือกห้องแชทใน LINE",
+        canFallbackNativeApp: false,
+      };
     }
 
     return {
       success: false,
+      canFallbackNativeApp: true,
       message: "ไม่พบฟังก์ชัน Share Target Picker ใน LINE LIFF SDK",
     };
   } catch (err: unknown) {
@@ -377,15 +388,17 @@ export async function shareFlexViaLiffPicker(
     if (
       errMsg.toLowerCase().includes("permission") ||
       errMsg.toLowerCase().includes("not available") ||
-      errMsg.toLowerCase().includes("api")
+      errMsg.toLowerCase().includes("api") ||
+      errMsg.toLowerCase().includes("login")
     ) {
       return {
         success: false,
+        canFallbackNativeApp: true,
         message:
-          "ยังไม่ได้เปิดฟังก์ชัน Share Target Picker ใน LINE Developers Console (กรุณาปรับ Share Target Picker เป็น ON ในแท็บ LIFF)",
+          "ยังไม่ได้เปิดฟังก์ชัน Share Target Picker หรือเปิดนอกแอป LINE ระบบจะเปิดแอป LINE ให้โดยตรง",
       };
     }
-    return { success: false, message: `LINE Share Target Picker แจ้งเตือน: ${errMsg}` };
+    return { success: false, canFallbackNativeApp: true, message: `LINE Note: ${errMsg}` };
   }
 }
 
