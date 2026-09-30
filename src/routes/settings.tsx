@@ -34,6 +34,7 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { PermissionGuard } from "@/components/auth/PermissionGuard";
 import { StaffManagementTab } from "@/components/auth/StaffManagementTab";
 import { FlexMessageVisualizer } from "@/components/line/FlexMessageVisualizer";
+import { FlexSimulatorImporter } from "@/components/line/FlexSimulatorImporter";
 import { BackupRestoreTab } from "@/components/settings/BackupRestoreTab";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -759,150 +760,128 @@ function SettingsPage() {
             </Card>
           </TabsContent>
 
-          {/* TAB 2: FLEX MESSAGE TEMPLATES */}
-          <TabsContent value="flex" className="space-y-4">
+          {/* TAB 2: FLEX MESSAGE TEMPLATES & SIMULATOR IMPORTER */}
+          <TabsContent value="flex" className="space-y-6">
             <div>
               <h2 className="text-base sm:text-lg font-bold text-foreground flex items-center gap-2">
-                <FileCode2 className="size-5 text-emerald-600" /> แม่แบบ Flex Message (Decoupled
-                Templates)
+                <FileCode2 className="size-5 text-emerald-600" /> แม่แบบ Flex Message & วาง JSON จาก
+                LINE Simulator
               </h2>
               <p className="text-xs text-muted-foreground">
-                แยกไฟล์ Flex Message แต่ละประเภทออกจากกัน แสดงผลแบบ LINE Chat Bubble และ JSON
-                Payload
+                ปรับแต่งหน้าตา Flex Message ด้วยตนเอง นำเข้า JSON จาก LINE Flex Simulator
+                หรือเลือกใช้แม่แบบมาตรฐานของระบบ
               </p>
             </div>
 
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-              {/* Card 1: Purchase Order */}
-              <Card className="rounded-2xl border bg-card p-4 space-y-3 shadow-xs hover:border-emerald-500/50 transition-colors">
-                <div className="flex items-center justify-between">
-                  <Badge className="bg-emerald-600 text-white text-xs">ใบสั่งซื้อสินค้า</Badge>
-                  <span className="font-mono text-[11px] text-muted-foreground">
-                    purchase-order-flex.ts
-                  </span>
-                </div>
-                <div>
-                  <h3 className="font-bold text-sm text-foreground">ใบสั่งซื้อสินค้าประจำวัน</h3>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    รูปแบบ: รายการ ➔ จำนวน ➔ หน่วยนับ พร้อมยอดรวมและมูลค่าราคาทุนโดยประมาณ
-                  </p>
-                </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="w-full rounded-xl text-xs gap-1.5 font-semibold text-emerald-700 dark:text-emerald-300"
-                  onClick={handlePreviewPOFlex}
-                >
-                  <Eye className="size-3.5" /> ดูตัวอย่าง Flex Message
-                </Button>
-              </Card>
+            {/* Playground: Paste JSON from LINE Simulator */}
+            <FlexSimulatorImporter />
 
-              {/* Card 2: Stock Alert */}
-              <Card className="rounded-2xl border bg-card p-4 space-y-3 shadow-xs hover:border-destructive/50 transition-colors">
-                <div className="flex items-center justify-between">
-                  <Badge variant="destructive" className="text-xs">
-                    แจ้งเตือนสต็อก
-                  </Badge>
-                  <span className="font-mono text-[11px] text-muted-foreground">
-                    stock-alert-flex.ts
-                  </span>
-                </div>
-                <div>
-                  <h3 className="font-bold text-sm text-foreground">
-                    แจ้งเตือนสินค้าใกล้หมด / หมด
-                  </h3>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    เน้นสถานะความเร่งด่วน พร้อมแสดงจำนวนที่ต้องเติมสต็อกหน้าร้าน
-                  </p>
-                </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="w-full rounded-xl text-xs gap-1.5 font-semibold text-destructive"
-                  onClick={handlePreviewStockAlertFlex}
-                >
-                  <Eye className="size-3.5" /> ดูตัวอย่าง Flex Message
-                </Button>
-              </Card>
+            <div className="pt-4 border-t space-y-3">
+              <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
+                <Layers className="size-4 text-primary" /> แม่แบบมาตรฐานของระบบ (System Decoupled
+                Templates)
+              </h3>
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                {/* Card 1: Purchase Order */}
+                <Card className="rounded-2xl border bg-card p-4 space-y-3 shadow-xs hover:border-emerald-500/50 transition-colors">
+                  <div className="flex items-center justify-between">
+                    <Badge className="bg-emerald-600 text-white text-xs">ใบสั่งซื้อสินค้า</Badge>
+                    <span className="font-mono text-[11px] text-muted-foreground">
+                      purchase-order-flex.ts
+                    </span>
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-sm text-foreground">ใบสั่งซื้อสินค้าประจำวัน</h4>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      ชื่อร้านขึ้นก่อน ไม่ซ้ำวันที่ และทุกตัวอักษรไม่หลุดบล็อก
+                    </p>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full rounded-xl text-xs gap-1.5 font-semibold text-emerald-700 dark:text-emerald-300"
+                    onClick={handlePreviewPOFlex}
+                  >
+                    <Eye className="size-3.5" /> ดูตัวอย่าง Flex Message
+                  </Button>
+                </Card>
 
-              {/* Card 3: Daily Summary */}
-              <Card className="rounded-2xl border bg-card p-4 space-y-3 shadow-xs hover:border-blue-500/50 transition-colors">
-                <div className="flex items-center justify-between">
-                  <Badge className="bg-blue-600 text-white text-xs">สรุปสต็อกรายวัน</Badge>
-                  <span className="font-mono text-[11px] text-muted-foreground">
-                    daily-summary-flex.ts
-                  </span>
-                </div>
-                <div>
-                  <h3 className="font-bold text-sm text-foreground">รายงานภาพรวมสต็อกประจำวัน</h3>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    สรุปสินค้าพร้อมจำหน่าย, สินค้าใกล้หมด, สินค้าหมด และมูลค่าสต็อกคงเหลือ
-                  </p>
-                </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="w-full rounded-xl text-xs gap-1.5 font-semibold text-blue-600 dark:text-blue-400"
-                  onClick={handlePreviewDailySummaryFlex}
-                >
-                  <Eye className="size-3.5" /> ดูตัวอย่าง Flex Message
-                </Button>
-              </Card>
+                {/* Card 2: Stock Alert */}
+                <Card className="rounded-2xl border bg-card p-4 space-y-3 shadow-xs hover:border-destructive/50 transition-colors">
+                  <div className="flex items-center justify-between">
+                    <Badge variant="destructive" className="text-xs">
+                      แจ้งเตือนสต็อก
+                    </Badge>
+                    <span className="font-mono text-[11px] text-muted-foreground">
+                      stock-alert-flex.ts
+                    </span>
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-sm text-foreground">
+                      แจ้งเตือนสินค้าใกล้หมด / หมด
+                    </h4>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      เน้นสถานะความเร่งด่วน พร้อมแสดงจำนวนที่ต้องเติมสต็อกหน้าร้าน
+                    </p>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full rounded-xl text-xs gap-1.5 font-semibold text-destructive"
+                    onClick={handlePreviewStockAlertFlex}
+                  >
+                    <Eye className="size-3.5" /> ดูตัวอย่าง Flex Message
+                  </Button>
+                </Card>
 
-              {/* Card 4: Mini App Portal Card */}
-              <Card className="rounded-2xl border bg-card p-4 space-y-3 shadow-xs hover:border-[#06C755] transition-colors">
-                <div className="flex items-center justify-between">
-                  <Badge className="bg-[#06C755] text-white text-xs">ทางเข้า Mini App</Badge>
-                  <span className="font-mono text-[11px] text-muted-foreground">
-                    mini-app-portal-flex.ts
-                  </span>
-                </div>
-                <div>
-                  <h3 className="font-bold text-sm text-foreground">การ์ดทางเข้า Mini App</h3>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    การ์ดเมนูรวมทางลัด สั่งซื้อ, สต็อก, สแกน POS สำหรับส่งในแชท LINE
-                  </p>
-                </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="w-full rounded-xl text-xs gap-1.5 font-semibold text-[#06C755]"
-                  onClick={handlePreviewPortalFlex}
-                >
-                  <Eye className="size-3.5" /> ดูตัวอย่าง Flex Message
-                </Button>
-              </Card>
-            </div>
+                {/* Card 3: Daily Summary */}
+                <Card className="rounded-2xl border bg-card p-4 space-y-3 shadow-xs hover:border-blue-500/50 transition-colors">
+                  <div className="flex items-center justify-between">
+                    <Badge className="bg-blue-600 text-white text-xs">สรุปสต็อกรายวัน</Badge>
+                    <span className="font-mono text-[11px] text-muted-foreground">
+                      daily-summary-flex.ts
+                    </span>
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-sm text-foreground">รายงานภาพรวมสต็อกประจำวัน</h4>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      สรุปสินค้าพร้อมจำหน่าย, สินค้าใกล้หมด, สินค้าหมด และมูลค่าสต็อกคงเหลือ
+                    </p>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full rounded-xl text-xs gap-1.5 font-semibold text-blue-600 dark:text-blue-400"
+                    onClick={handlePreviewDailySummaryFlex}
+                  >
+                    <Eye className="size-3.5" /> ดูตัวอย่าง Flex Message
+                  </Button>
+                </Card>
 
-            {/* Embedded Live Preview of Default Flex Message */}
-            <div className="pt-2">
-              <div className="text-xs font-semibold text-muted-foreground mb-2 flex items-center gap-1.5">
-                <MessageSquare className="size-4 text-primary" /> ตัวอย่างการแสดงผล Flex Message สด
-                (Live Preview)
+                {/* Card 4: Mini App Portal Card */}
+                <Card className="rounded-2xl border bg-card p-4 space-y-3 shadow-xs hover:border-[#06C755] transition-colors">
+                  <div className="flex items-center justify-between">
+                    <Badge className="bg-[#06C755] text-white text-xs">ทางเข้า Mini App</Badge>
+                    <span className="font-mono text-[11px] text-muted-foreground">
+                      mini-app-portal-flex.ts
+                    </span>
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-sm text-foreground">การ์ดทางเข้า Mini App</h4>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      การ์ดเมนูรวมทางลัด สั่งซื้อ, สต็อก, สแกน POS สำหรับส่งในแชท LINE
+                    </p>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full rounded-xl text-xs gap-1.5 font-semibold text-[#06C755]"
+                    onClick={handlePreviewPortalFlex}
+                  >
+                    <Eye className="size-3.5" /> ดูตัวอย่าง Flex Message
+                  </Button>
+                </Card>
               </div>
-              <FlexMessageVisualizer
-                flexData={createPurchaseOrderFlexBubble([
-                  {
-                    name: "มาม่า บะหมี่กึ่งสำเร็จรูป รสต้มยำกุ้ง 55g",
-                    quantity: 30,
-                    unitName: "ซอง",
-                    costPrice: 6.0,
-                  },
-                  {
-                    name: "โค้ก น้ำอัดลม ออริจินัล 325ml",
-                    quantity: 48,
-                    unitName: "กระป๋อง",
-                    costPrice: 12.0,
-                  },
-                  {
-                    name: "เลย์ มันฝรั่งทอดกรอบ รสคลาสสิค 45g",
-                    quantity: 20,
-                    unitName: "ซอง",
-                    costPrice: 17.5,
-                  },
-                ])}
-                title="ตัวอย่างใบสั่งซื้อสินค้า (Purchase Order Flex)"
-              />
             </div>
           </TabsContent>
 
@@ -1379,6 +1358,47 @@ function SettingsPage() {
                   </Alert>
                 ) : null}
 
+                {/* LIFF Endpoint URL Configuration Guide */}
+                <div className="rounded-xl border border-primary/30 bg-primary/5 p-3.5 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-xs text-foreground flex items-center gap-1.5">
+                      <ExternalLink className="size-4 text-primary" /> Endpoint URL ใน LINE
+                      Developers Console (สำหรับเริ่มที่แดชบอร์ด)
+                    </span>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-7 text-[11px] gap-1 font-semibold text-primary border-primary/40 bg-background"
+                      onClick={() =>
+                        handleCopyLink(
+                          typeof window !== "undefined" ? window.location.origin + "/" : "/",
+                          "endpoint_url",
+                        )
+                      }
+                    >
+                      {copiedKey === "endpoint_url" ? (
+                        <>
+                          <Check className="size-3 text-emerald-600" /> คัดลอกแล้ว
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="size-3" /> คัดลอก Endpoint URL
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                  <div className="font-mono text-xs text-primary bg-background p-2.5 rounded-lg border font-semibold">
+                    {typeof window !== "undefined" ? window.location.origin + "/" : "/"}
+                  </div>
+                  <p className="text-[11px] text-muted-foreground leading-relaxed">
+                    💡 <strong>สำคัญมาก:</strong> ใน LINE Developers Console &gt; LIFF App &gt; ช่อง{" "}
+                    <strong>Endpoint URL</strong> ให้กรอก URL หน้าแรก (จบด้วย <code>/</code>{" "}
+                    โดยไม่ต้องใส่ <code>/reorder</code>) เพื่อให้เมื่อผู้ใช้เปิดแอพผ่าน LINE
+                    หรือคลิก LIFF URL ระบบจะเริ่มที่ <strong>หน้าแรก / แดชบอร์ด (Dashboard)</strong>{" "}
+                    เป็นค่าเริ่มต้นเสมอ
+                  </p>
+                </div>
+
                 {/* 1-Click Copy Links for Rich Menu & LINE OA */}
                 <div>
                   <h3 className="text-xs font-bold text-foreground mb-2 flex items-center gap-1.5">
@@ -1386,11 +1406,47 @@ function SettingsPage() {
                     (สำหรับใส่ใน Rich Menu บน LINE Official Account Manager)
                   </h3>
                   <div className="grid gap-2.5 sm:grid-cols-2">
-                    {/* Link 1: Reorder */}
+                    {/* Link 1: Dashboard (Default) */}
+                    <div className="rounded-xl border-2 border-emerald-500/40 p-3 bg-emerald-50/40 dark:bg-emerald-950/20 space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-xs text-emerald-800 dark:text-emerald-300 flex items-center gap-1">
+                          📊 1. ทางเข้าหน้าแดชบอร์ดหลัก (Dashboard - หน้าแรก)
+                        </span>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-7 text-[11px] gap-1 text-emerald-700 dark:text-emerald-300"
+                          onClick={() =>
+                            handleCopyLink(
+                              `https://liff.line.me/${clientLiffId || "2007000000-xxxxxx"}`,
+                              "dashboard_link",
+                            )
+                          }
+                        >
+                          {copiedKey === "dashboard_link" ? (
+                            <>
+                              <Check className="size-3 text-emerald-600" /> คัดลอกแล้ว
+                            </>
+                          ) : (
+                            <>
+                              <Copy className="size-3" /> คัดลอกลิงก์
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                      <div className="font-mono text-[11px] text-foreground font-semibold truncate bg-background p-2 rounded-lg border">
+                        https://liff.line.me/{clientLiffId || "2007000000-xxxxxx"}
+                      </div>
+                      <span className="text-[10px] text-muted-foreground block">
+                        *ใช้สำหรับตั้งค่าปุ่มหลัก เพื่อให้เปิดเข้าสู่หน้าแดชบอร์ดทันที
+                      </span>
+                    </div>
+
+                    {/* Link 2: Reorder */}
                     <div className="rounded-xl border p-3 bg-muted/30 space-y-1.5">
                       <div className="flex items-center justify-between">
                         <span className="font-bold text-xs text-foreground flex items-center gap-1">
-                          🛒 1. ทางเข้าหน้าสั่งซื้อสินค้า (Reorder)
+                          🛒 2. ทางเข้าหน้าสั่งซื้อสินค้า (Reorder)
                         </span>
                         <Button
                           size="sm"
@@ -1417,13 +1473,16 @@ function SettingsPage() {
                       <div className="font-mono text-[11px] text-muted-foreground truncate bg-background p-2 rounded-lg border">
                         https://liff.line.me/{clientLiffId || "2007000000-xxxxxx"}/reorder
                       </div>
+                      <span className="text-[10px] text-muted-foreground block">
+                        *ใช้สำหรับปุ่มลัดสั่งซื้อสินค้าประจำวัน / ออกใบ PO
+                      </span>
                     </div>
 
-                    {/* Link 2: Stock */}
+                    {/* Link 3: Stock */}
                     <div className="rounded-xl border p-3 bg-muted/30 space-y-1.5">
                       <div className="flex items-center justify-between">
                         <span className="font-bold text-xs text-foreground flex items-center gap-1">
-                          📦 2. ทางเข้าหน้าจัดการสต็อก (Stock)
+                          📦 3. ทางเข้าหน้าจัดการสต็อก (Stock)
                         </span>
                         <Button
                           size="sm"
@@ -1452,11 +1511,11 @@ function SettingsPage() {
                       </div>
                     </div>
 
-                    {/* Link 3: Scan */}
+                    {/* Link 4: Scan */}
                     <div className="rounded-xl border p-3 bg-muted/30 space-y-1.5">
                       <div className="flex items-center justify-between">
                         <span className="font-bold text-xs text-foreground flex items-center gap-1">
-                          📷 3. ทางเข้าหน้าสแกนบาร์โค้ด (POS Scanner)
+                          📷 4. ทางเข้าหน้าสแกนบาร์โค้ด (POS Scanner)
                         </span>
                         <Button
                           size="sm"
@@ -1482,39 +1541,6 @@ function SettingsPage() {
                       </div>
                       <div className="font-mono text-[11px] text-muted-foreground truncate bg-background p-2 rounded-lg border">
                         https://liff.line.me/{clientLiffId || "2007000000-xxxxxx"}/scan
-                      </div>
-                    </div>
-
-                    {/* Link 4: Dashboard */}
-                    <div className="rounded-xl border p-3 bg-muted/30 space-y-1.5">
-                      <div className="flex items-center justify-between">
-                        <span className="font-bold text-xs text-foreground flex items-center gap-1">
-                          📊 4. ทางเข้าหน้าแดชบอร์ดหลัก (Dashboard)
-                        </span>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="h-7 text-[11px] gap-1 text-emerald-700 dark:text-emerald-300"
-                          onClick={() =>
-                            handleCopyLink(
-                              `https://liff.line.me/${clientLiffId || "2007000000-xxxxxx"}`,
-                              "dashboard_link",
-                            )
-                          }
-                        >
-                          {copiedKey === "dashboard_link" ? (
-                            <>
-                              <Check className="size-3 text-emerald-600" /> คัดลอกแล้ว
-                            </>
-                          ) : (
-                            <>
-                              <Copy className="size-3" /> คัดลอกลิงก์
-                            </>
-                          )}
-                        </Button>
-                      </div>
-                      <div className="font-mono text-[11px] text-muted-foreground truncate bg-background p-2 rounded-lg border">
-                        https://liff.line.me/{clientLiffId || "2007000000-xxxxxx"}
                       </div>
                     </div>
                   </div>

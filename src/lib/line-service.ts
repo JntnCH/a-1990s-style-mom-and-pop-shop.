@@ -228,9 +228,12 @@ export function buildOrderFlexMessage(
     barcode: o.product.barcode,
   }));
 
+  const liffId = getClientLiffId() || undefined;
+
   return createPurchaseOrderFlexBubble(items, {
     storeName,
     note,
+    liffId,
   });
 }
 

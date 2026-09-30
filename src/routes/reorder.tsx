@@ -90,6 +90,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { createPurchaseOrderFlexBubble, createStockAlertFlexBubble } from "@/lib/flex-templates";
 import { FlexMessageVisualizer } from "@/components/line/FlexMessageVisualizer";
+import { FlexSimulatorImporter } from "@/components/line/FlexSimulatorImporter";
 import { getLineServerConfigFn, sendLineMessagingApiFn } from "@/lib/line-server-fn";
 import {
   buildOrderPlainText,
@@ -249,6 +250,9 @@ function ReorderPage() {
   // LINE LIFF ID Setup Modal State (for 1-click Friend Picker)
   const [liffIdModalOpen, setLiffIdModalOpen] = useState(false);
   const [liffIdInputValue, setLiffIdInputValue] = useState("");
+
+  // Flex Simulator Importer Modal
+  const [flexSimulatorModalOpen, setFlexSimulatorModalOpen] = useState(false);
 
   const reloadData = useCallback(() => {
     const allProds = MasterStore.getProducts();
@@ -1058,6 +1062,14 @@ function ReorderPage() {
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setFlexSimulatorModalOpen(true)}
+            className="h-10 px-3 rounded-xl text-xs gap-1.5 font-semibold text-[#06C755] border-[#06C755]/40 hover:bg-emerald-50 dark:hover:bg-emerald-950/20"
+          >
+            <Sparkles className="size-3.5" /> ปรับแต่ง Flex JSON (Simulator)
+          </Button>
           <Button
             variant="outline"
             size="sm"
@@ -3378,6 +3390,31 @@ function ReorderPage() {
               </Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* CUSTOM FLEX MESSAGE SIMULATOR IMPORTER MODAL */}
+      <Dialog open={flexSimulatorModalOpen} onOpenChange={setFlexSimulatorModalOpen}>
+        <DialogContent className="w-[96vw] max-w-4xl rounded-2xl p-4 sm:p-6 max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-base sm:text-lg flex items-center gap-2">
+              <Sparkles className="size-5 text-[#06C755]" /> เครื่องมือนำเข้า & วาง Flex Message
+              JSON จาก LINE Simulator
+            </DialogTitle>
+            <DialogDescription className="text-xs">
+              ออกแบบจาก LINE Flex Simulator แล้วนำ JSON
+              มาวางเพื่อปรับแต่งหน้าตาใบสั่งซื้อให้ตรงใจคุณ
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="py-2">
+            <FlexSimulatorImporter
+              onSaved={() => {
+                reloadData();
+                setFlexSimulatorModalOpen(false);
+              }}
+            />
+          </div>
         </DialogContent>
       </Dialog>
     </div>

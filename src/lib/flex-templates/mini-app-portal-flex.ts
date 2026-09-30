@@ -81,11 +81,53 @@ export function createMiniAppPortalFlexBubble(options: MiniAppPortalOptions = {}
           size: "sm",
           color: "#1F2937",
         },
-        // Menu 1: Reorder
+        // Menu 1: Dashboard (Default Entrance)
         {
           type: "box",
           layout: "horizontal",
           backgroundColor: "#F0FDF4",
+          cornerRadius: "12px",
+          paddingAll: "12px",
+          action: {
+            type: "uri",
+            label: "เปิดแดชบอร์ดร้านค้า",
+            uri: dashboardUrl,
+          },
+          contents: [
+            {
+              type: "text",
+              text: "📊",
+              size: "lg",
+              flex: 0,
+            },
+            {
+              type: "box",
+              layout: "vertical",
+              margin: "md",
+              contents: [
+                {
+                  type: "text",
+                  text: "แดชบอร์ด & ภาพรวมร้านค้า (หน้าหลัก)",
+                  weight: "bold",
+                  size: "sm",
+                  color: "#065F46",
+                },
+                {
+                  type: "text",
+                  text: "ยอดขาย, สต็อกสินค้าพร้อมขาย, และการทำงานด่วน",
+                  size: "xxs",
+                  color: "#047857",
+                  margin: "xs",
+                },
+              ],
+            },
+          ],
+        },
+        // Menu 2: Reorder
+        {
+          type: "box",
+          layout: "horizontal",
+          backgroundColor: "#F8FAFC",
           cornerRadius: "12px",
           paddingAll: "12px",
           action: {
@@ -110,20 +152,20 @@ export function createMiniAppPortalFlexBubble(options: MiniAppPortalOptions = {}
                   text: "สั่งซื้อสินค้าประจำวัน (Reorder)",
                   weight: "bold",
                   size: "sm",
-                  color: "#065F46",
+                  color: "#1E293B",
                 },
                 {
                   type: "text",
                   text: "คำนวณยอดสั่ง, ออกใบ PO, ส่งเข้า LINE",
                   size: "xxs",
-                  color: "#047857",
+                  color: "#64748B",
                   margin: "xs",
                 },
               ],
             },
           ],
         },
-        // Menu 2: Stock
+        // Menu 3: Stock
         {
           type: "box",
           layout: "horizontal",
@@ -165,7 +207,7 @@ export function createMiniAppPortalFlexBubble(options: MiniAppPortalOptions = {}
             },
           ],
         },
-        // Menu 3: Scanner
+        // Menu 4: Scanner
         {
           type: "box",
           layout: "horizontal",
