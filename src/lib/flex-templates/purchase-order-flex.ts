@@ -53,7 +53,7 @@ export function createPurchaseOrderFlexBubble(
           if (parsed.type === "bubble" || parsed.type === "carousel") {
             return {
               type: "flex" as const,
-              altText: `📦 ใบสั่งซื้อสินค้า - ${options.storeName || "ร้าน MiniMark"}`,
+              altText: `📦 ใบสั่งซื้อสินค้า - ${options.storeName || "ร้าน โชห่วยยุค 90s"}`,
               contents: parsed,
             };
           }
