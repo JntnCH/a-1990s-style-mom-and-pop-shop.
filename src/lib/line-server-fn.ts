@@ -1,5 +1,9 @@
 import { createServerFn } from "@tanstack/react-start";
-import { createMiniAppPortalFlexBubble } from "./flex-templates/mini-app-portal-flex";
+import {
+  createMiniAppPortalFlexBubble,
+  DEFAULT_STORE_NAME,
+  getSystemStoreName,
+} from "./flex-templates";
 
 export interface SendLineOrderPayload {
   toUserIdOrGroupId?: string | undefined;
@@ -100,7 +104,7 @@ const globalServerDatabase: {
       displayName: "ผู้ดูแลร้าน (Admin Master)",
       pictureUrl:
         "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&auto=format&fit=crop&q=80",
-      statusMessage: "ประจำหน้าร้าน MiniMark",
+      statusMessage: "ประจำหน้าร้าน โชห่วยยุค 90s",
       followedAt: "2026-09-20 08:30 น.",
       lastInteractionAt: "2026-09-25 10:15 น.",
       role: "admin",
@@ -504,7 +508,7 @@ export const sendMiniAppPortalCardFn = createServerFn({ method: "POST" })
     ).trim();
 
     const liffId = envLiff && envLiff !== "xxxxx-xxxxx" ? envLiff : "2007000000-xxxxxx";
-    const storeName = data.storeName || "ร้าน MiniMark";
+    const storeName = getSystemStoreName(data.storeName);
 
     const portalBubble = createMiniAppPortalFlexBubble({
       storeName,

@@ -52,6 +52,7 @@ import {
   type LabelItemToPrint,
   type LabelTemplateType,
 } from "@/lib/printer-service";
+import { DEFAULT_STORE_NAME, getSystemStoreName } from "@/lib/flex-templates";
 import { MasterStore, type CategoryItem, type ProductItem, type ZoneItem } from "@/lib/store";
 
 interface BarcodeLabelSheetProps {
@@ -74,7 +75,7 @@ export function BarcodeLabelSheet({ initialProductId }: BarcodeLabelSheetProps) 
 
   // Design Options
   const [options, setOptions] = useState<LabelDesignOptions>(DEFAULT_LABEL_OPTIONS);
-  const [storeName, setStoreName] = useState("ร้าน MiniMark");
+  const [storeName, setStoreName] = useState(() => getSystemStoreName());
 
   // Preview Container Ref for Direct Browser Print
   const printContainerRef = useRef<HTMLDivElement | null>(null);

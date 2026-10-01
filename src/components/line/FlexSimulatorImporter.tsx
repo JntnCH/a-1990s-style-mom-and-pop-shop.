@@ -28,6 +28,8 @@ import {
   createMiniAppPortalFlexBubble,
   createPurchaseOrderFlexBubble,
   createStockAlertFlexBubble,
+  DEFAULT_STORE_NAME,
+  getSystemStoreName,
 } from "@/lib/flex-templates";
 import { shareFlexViaLiffPicker } from "@/lib/line-service";
 
@@ -38,20 +40,24 @@ interface FlexSimulatorImporterProps {
 const STORAGE_KEY = "minimark_custom_po_flex_json";
 
 export function FlexSimulatorImporter({ onSaved }: FlexSimulatorImporterProps) {
-  const defaultPOFlex = createPurchaseOrderFlexBubble([
-    {
-      name: "ปลาร้า แม่เหรียญ ฝาขาว 380 มล.",
-      quantity: 1,
-      unitName: "แพ็ค",
-      costPrice: 180,
-    },
-    {
-      name: "ครีมเภสัช 45 ก.",
-      quantity: 15,
-      unitName: "ขวด",
-      costPrice: 25,
-    },
-  ]);
+  const currentStoreName = getSystemStoreName();
+  const defaultPOFlex = createPurchaseOrderFlexBubble(
+    [
+      {
+        name: "ปลาร้า แม่เหรียญ ฝาขาว 380 มล.",
+        quantity: 1,
+        unitName: "แพ็ค",
+        costPrice: 180,
+      },
+      {
+        name: "ครีมเภสัช 45 ก.",
+        quantity: 15,
+        unitName: "ขวด",
+        costPrice: 25,
+      },
+    ],
+    { storeName: currentStoreName },
+  );
 
   const [rawJson, setRawJson] = useState<string>("");
   const [parsedFlex, setParsedFlex] = useState<unknown>(defaultPOFlex);
@@ -65,7 +71,11 @@ export function FlexSimulatorImporter({ onSaved }: FlexSimulatorImporterProps) {
       const saved = localStorage.getItem(STORAGE_KEY);
       if (saved && saved.trim()) {
         try {
-          const obj = JSON.parse(saved);
+          const dynamicSaved = saved
+            .replace(/ร้าน MiniMark \(มินิมาร์ท โชว์ห่วย\)/g, currentStoreName)
+            .replace(/ร้าน MiniMark/g, currentStoreName)
+            .replace(/MiniMark/g, currentStoreName.replace(/^ร้าน\s*/, ""));
+          const obj = JSON.parse(dynamicSaved);
           setRawJson(JSON.stringify(obj, null, 2));
           setParsedFlex(obj);
           setIsCustomSaved(true);
@@ -92,7 +102,7 @@ export function FlexSimulatorImporter({ onSaved }: FlexSimulatorImporterProps) {
       if (parsed.type === "bubble" || parsed.type === "carousel") {
         parsed = {
           type: "flex",
-          altText: "📦 ใบสั่งซื้อสินค้า — ร้าน MiniMark",
+          altText: `📦 ใบสั่งซื้อสินค้า — ${currentStoreName}`,
           contents: parsed,
         };
       }
@@ -177,12 +187,12 @@ export function FlexSimulatorImporter({ onSaved }: FlexSimulatorImporterProps) {
               status: "LOW_STOCK",
             },
           ],
-          { storeName: "ร้าน MiniMark" },
+          { storeName: currentStoreName },
         );
         break;
       case "PORTAL":
         presetObj = createMiniAppPortalFlexBubble({
-          storeName: "ร้าน MiniMark",
+          storeName: currentStoreName,
           liffId: "2011710264-gaZ7oEcK",
         });
         break;
@@ -196,7 +206,7 @@ export function FlexSimulatorImporter({ onSaved }: FlexSimulatorImporterProps) {
             totalEstimatedCost: 4500,
             reorderCount: 6,
           },
-          { storeName: "ร้าน MiniMark" },
+          { storeName: currentStoreName },
         );
         break;
     }
@@ -219,7 +229,7 @@ export function FlexSimulatorImporter({ onSaved }: FlexSimulatorImporterProps) {
     try {
       const res = await shareFlexViaLiffPicker(
         parsedFlex,
-        "ทดสอบส่ง Flex Message จากระบบ MiniMark",
+        `ทดสอบส่ง Flex Message จาก${currentStoreName}`,
       );
       if (res.success) {
         toast.success("ส่ง LINE Flex Message เข้าห้องแชทสำเร็จเรียบร้อย");

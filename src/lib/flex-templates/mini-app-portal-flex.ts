@@ -1,7 +1,9 @@
 /**
  * LINE Mini App Entrance Portal Flex Message Template
- * Enables LINE Messaging API to act as the primary entrance gateway to MiniMark LINE Mini App
+ * Enables LINE Messaging API to act as the primary entrance gateway to the store's LINE Mini App
  */
+
+import { DEFAULT_STORE_NAME, getSystemStoreName } from "./index";
 
 export interface MiniAppPortalOptions {
   storeName?: string;
@@ -10,7 +12,7 @@ export interface MiniAppPortalOptions {
 }
 
 export function createMiniAppPortalFlexBubble(options: MiniAppPortalOptions = {}) {
-  const storeName = options.storeName || "ร้าน MiniMark";
+  const storeName = getSystemStoreName(options.storeName);
   const liffId = options.liffId || "2007000000-xxxxxx";
   const baseUrl = options.customBaseUrl || `https://liff.line.me/${liffId}`;
 

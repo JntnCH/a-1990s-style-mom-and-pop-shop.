@@ -3,6 +3,8 @@
  * แยกไฟล์ออกมาเฉพาะ เพื่อให้ปรับแต่ง ดีไซน์ เพิ่ม-แก้ไข ได้ง่าย
  */
 
+import { DEFAULT_STORE_NAME, getSystemStoreName } from "./index";
+
 export interface FlexStockAlertItem {
   name: string;
   stock: number;
@@ -31,7 +33,7 @@ export function createStockAlertFlexBubble(
     hour: "2-digit",
     minute: "2-digit",
   });
-  const storeName = options.storeName || "ร้าน MiniMark";
+  const storeName = getSystemStoreName(options.storeName);
   const title = options.title || "แจ้งเตือนสต็อกสินค้าต้องสั่งซื้อ";
   const headerBg = "#ef4444"; // Red for alert
 

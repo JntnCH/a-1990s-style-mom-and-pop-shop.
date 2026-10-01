@@ -140,13 +140,13 @@ export const DEFAULT_PRINT_JOBS: PrintJobRecord[] = [
 ];
 
 export const DEFAULT_RECEIPT_CONFIG: ReceiptDesignConfig = {
-  storeName: "ร้าน MiniMark (มินิมาร์ท โชว์ห่วย)",
+  storeName: "ร้าน โชห่วยยุค 90s",
   branchName: "สาขา 0001 (หน้าร้านพัฒนาการ)",
   taxId: "0105562098765",
   address: "123/45 ถนนพัฒนาการ แขวงสวนหลวง กรุงเทพฯ 10250",
   phone: "02-123-4567, 081-987-6543",
-  headerMessage: "ยินดีต้อนรับสู่ MiniMark สินค้าคุณภาพ ราคากันเอง",
-  footerMessage: "ขอบคุณที่ใช้บริการ MiniMark โอกาสหน้าเชิญใหม่ครับ",
+  headerMessage: "ยินดีต้อนรับสู่ ร้าน โชห่วยยุค 90s สินค้าคุณภาพ ราคากันเอง",
+  footerMessage: "ขอบคุณที่ใช้บริการ ร้าน โชห่วยยุค 90s โอกาสหน้าเชิญใหม่ครับ",
   paperWidth: "58mm",
   showLogo: true,
   showBarcode: true,

@@ -8,6 +8,8 @@
  * - Image Canvas Snapshot
  */
 
+import { DEFAULT_STORE_NAME, getSystemStoreName } from "./flex-templates";
+
 export interface ExportOrderItem {
   productName: string;
   barcode: string;
@@ -72,10 +74,12 @@ export function exportOrderToCSV(order: ExportOrderPayload) {
     item.total.toFixed(2),
   ]);
 
+  const resolvedStoreName = getSystemStoreName(order.storeName);
+
   // Header info rows
   const metaRows = [
     [`ใบสั่งซื้อสินค้า (Purchase Order)`, `เลขที่: ${order.orderNumber}`],
-    [`ร้านค้า:`, `${order.storeName || "ร้าน MiniMark"}`],
+    [`ร้านค้า:`, `${resolvedStoreName}`],
     [`ซัพพลายเออร์:`, `${order.supplierName || "ซัพพลายเออร์ทั่วไป"}`],
     [`วันที่สั่งซื้อ:`, `${order.createdAt}`],
     [`หมายเหตุ:`, `${order.note || "-"}`],
@@ -110,9 +114,10 @@ export function exportOrderToCSV(order: ExportOrderPayload) {
  * 2. Export as Formatted Text (.txt)
  */
 export function exportOrderToTXT(order: ExportOrderPayload) {
+  const resolvedStoreName = getSystemStoreName(order.storeName);
   let txt = `====================================================\n`;
   txt += `        ใบสั่งซื้อสินค้า (PURCHASE ORDER)\n`;
-  txt += `        ${order.storeName || "ร้าน MiniMark"}\n`;
+  txt += `        ${resolvedStoreName}\n`;
   txt += `====================================================\n`;
   txt += `เลขที่ใบสั่งซื้อ : ${order.orderNumber}\n`;
   txt += `วันที่ออกเอกสาร  : ${order.createdAt}\n`;
@@ -212,9 +217,9 @@ export function printOrderAsPDF(order: ExportOrderPayload) {
       <body>
         <div class="header">
           <div>
-            <div class="title">${order.storeName || "ร้าน MiniMark"}</div>
+            <div class="title">${resolvedStoreName}</div>
             <div>ใบสั่งซื้อสินค้า (PURCHASE ORDER)</div>
-            <div style="font-size: 11px; color: #666;">มินิมาร์ท โชว์ห่วย ระบบจัดการสต็อกสินค้า</div>
+            <div style="font-size: 11px; color: #666;">ระบบจัดการสต็อกสินค้า</div>
           </div>
           <div style="text-align: right;">
             <div style="font-size: 16px; font-weight: bold; font-family: monospace;">${order.orderNumber}</div>

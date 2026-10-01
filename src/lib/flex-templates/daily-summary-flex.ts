@@ -3,6 +3,8 @@
  * แยกไฟล์ออกมาเฉพาะ เพื่อให้ปรับแต่ง ดีไซน์ เพิ่ม-แก้ไข ได้ง่าย
  */
 
+import { DEFAULT_STORE_NAME, getSystemStoreName } from "./index";
+
 export interface DailySummaryFlexData {
   totalProducts: number;
   inStockCount: number;
@@ -31,7 +33,7 @@ export function createDailySummaryFlexBubble(
     hour: "2-digit",
     minute: "2-digit",
   });
-  const storeName = options.storeName || "ร้าน MiniMark";
+  const storeName = getSystemStoreName(options.storeName);
   const themeColor = options.themeColor || "#2563eb"; // Blue
 
   return {

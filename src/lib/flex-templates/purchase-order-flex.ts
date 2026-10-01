@@ -1,16 +1,13 @@
 /**
  * LINE Flex Message Template for Purchase Orders (ใบสั่งซื้อสินค้า)
- * แยกไฟล์ออกมาเฉพาะ เพื่อให้ปรับแต่ง ดีไซน์ เพิ่ม-แก้ไข และดูแลได้ง่าย
- */
-
-/**
- * LINE Flex Message Template for Purchase Orders (ใบสั่งซื้อสินค้า)
  * ออกแบบโครงสร้าง:
- * 1. ชื่อร้านขึ้นก่อนเด่นชัด
+ * 1. ชื่อร้านขึ้นก่อนเด่นชัด (รองรับ options.storeName และ Fallback กลาง: "ร้าน โชห่วยยุค 90s")
  * 2. ข้อมูลไม่ซ้ำซ้อน (วันที่แสดงบรรทัดเดียว ไม่ซ้ำในชื่อหัวข้อ)
  * 3. ทุกตัวอักษร wrap: true ไม่ออกนอกบล็อกและไม่โดนตัดเป็น ...
- * 4. รองรับการแทนที่ด้วย Custom JSON จาก LINE Simulator
+ * 4. รองรับการแทนที่ด้วย Custom JSON จาก LINE Simulator โดยไม่อิงชื่อร้าน hardcode
  */
+
+import { DEFAULT_STORE_NAME, getSystemStoreName } from "./index";
 
 export interface FlexOrderItem {
   name: string;
@@ -40,20 +37,31 @@ export function createPurchaseOrderFlexBubble(
   items: FlexOrderItem[],
   options: PurchaseOrderFlexOptions = {},
 ) {
+  const storeName = getSystemStoreName(options.storeName);
+
   // Check if user has saved a custom template in localStorage
   if (typeof window !== "undefined") {
     try {
       const customSaved = localStorage.getItem("minimark_custom_po_flex_json");
       if (customSaved && customSaved.trim()) {
-        const parsed = JSON.parse(customSaved);
+        // Dynamically replace legacy hardcoded store name if present in custom template
+        const dynamicJson = customSaved
+          .replace(/ร้าน MiniMark \(มินิมาร์ท โชว์ห่วย\)/g, storeName)
+          .replace(/ร้าน MiniMark/g, storeName)
+          .replace(/MiniMark/g, storeName.replace(/^ร้าน\s*/, ""));
+
+        const parsed = JSON.parse(dynamicJson);
         if (parsed && typeof parsed === "object") {
           if (parsed.type === "flex" && parsed.contents) {
+            if (!parsed.altText || parsed.altText.includes("MiniMark")) {
+              parsed.altText = `📦 ใบสั่งซื้อสินค้า - ${storeName}`;
+            }
             return parsed;
           }
           if (parsed.type === "bubble" || parsed.type === "carousel") {
             return {
               type: "flex" as const,
-              altText: `📦 ใบสั่งซื้อสินค้า - ${options.storeName || "ร้าน โชห่วยยุค 90s"}`,
+              altText: `📦 ใบสั่งซื้อสินค้า - ${storeName}`,
               contents: parsed,
             };
           }
@@ -78,7 +86,7 @@ export function createPurchaseOrderFlexBubble(
       hour: "2-digit",
       minute: "2-digit",
     });
-  const storeName = options.storeName || "ร้าน MiniMark";
+
   const note = options.note || "ใบสั่งซื้อสินค้าประจำวัน";
   // Clean note so date is not repeated if passed in note
   const cleanNote = note.replace(/\s*\(.*?\)\s*/g, "").trim() || "ใบสั่งซื้อสินค้าประจำวัน";

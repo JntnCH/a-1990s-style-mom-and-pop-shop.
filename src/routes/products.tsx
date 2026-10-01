@@ -263,8 +263,8 @@ function ProductsPage() {
 
   const validateBarcodeLive = (barcodeValue: string, currentId?: string) => {
     if (!barcodeValue.trim()) {
-      setBarcodeError("กรุณาระบุบาร์โค้ดสินค้า");
-      return false;
+      setBarcodeError(null);
+      return true;
     }
     const isDup = MasterStore.checkDuplicateBarcode(barcodeValue, currentId);
     if (isDup) {
@@ -1184,7 +1184,9 @@ function ProductsPage() {
               {/* Barcode */}
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
-                  <Label className="text-xs font-semibold">รหัสบาร์โค้ด / QR Code *</Label>
+                  <Label className="text-xs font-semibold">
+                    รหัสบาร์โค้ด / QR Code (ไม่บังคับ)
+                  </Label>
                   {barcodeError && (
                     <span className="text-[10px] text-destructive">{barcodeError}</span>
                   )}
@@ -1347,7 +1349,9 @@ function ProductsPage() {
             <Button
               className="h-11 sm:h-10 rounded-xl w-full sm:w-auto font-bold bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm"
               onClick={handleSaveProduct}
-              disabled={!formName.trim() || !formBarcode.trim() || !formSku.trim()}
+              disabled={
+                !formName.trim() || !formSku.trim() || Boolean(skuError) || Boolean(barcodeError)
+              }
             >
               บันทึกข้อมูลสินค้า
             </Button>

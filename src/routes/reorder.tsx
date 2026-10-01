@@ -88,7 +88,12 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { createPurchaseOrderFlexBubble, createStockAlertFlexBubble } from "@/lib/flex-templates";
+import {
+  createPurchaseOrderFlexBubble,
+  createStockAlertFlexBubble,
+  DEFAULT_STORE_NAME,
+  getSystemStoreName,
+} from "@/lib/flex-templates";
 import { FlexMessageVisualizer } from "@/components/line/FlexMessageVisualizer";
 import { FlexSimulatorImporter } from "@/components/line/FlexSimulatorImporter";
 import { getLineServerConfigFn, sendLineMessagingApiFn } from "@/lib/line-server-fn";
@@ -253,6 +258,7 @@ function ReorderPage() {
 
   // Flex Simulator Importer Modal
   const [flexSimulatorModalOpen, setFlexSimulatorModalOpen] = useState(false);
+  const currentStoreName = getSystemStoreName();
 
   const reloadData = useCallback(() => {
     const allProds = MasterStore.getProducts();
@@ -397,7 +403,7 @@ function ReorderPage() {
       orderNumber: `PO-${Date.now().toString().slice(-6)}`,
       createdAt:
         new Date().toLocaleDateString("th-TH") + " " + new Date().toLocaleTimeString("th-TH"),
-      storeName: "ร้าน MiniMark",
+      storeName: currentStoreName,
       supplierName: supplierNameInput.trim() || "ซัพพลายเออร์ทั่วไป",
       items: fullItems.map((f) => ({
         productName: f.product.name,
@@ -420,7 +426,7 @@ function ReorderPage() {
     const payload: ExportOrderPayload = {
       orderNumber: po.orderNumber,
       createdAt: po.createdAt,
-      storeName: "ร้าน MiniMark",
+      storeName: currentStoreName,
       supplierName: po.supplierName || "ซัพพลายเออร์ทั่วไป",
       items: po.items.map((i) => {
         const p = products.find((prod) => prod.id === i.productId);
@@ -716,7 +722,7 @@ function ReorderPage() {
       unitName: getUnitName(p.unitId),
       status: (p.stock <= 0 ? "OUT_OF_STOCK" : "LOW_STOCK") as "OUT_OF_STOCK" | "LOW_STOCK",
     }));
-    const flexMsg = createStockAlertFlexBubble(alertPayload, { storeName: "ร้าน MiniMark" });
+    const flexMsg = createStockAlertFlexBubble(alertPayload, { storeName: currentStoreName });
     setFlexPreviewData(flexMsg);
     setFlexPreviewTitle(`แจ้งเตือนสินค้าต้องสั่งซื้อ (${allReorderNeeded.length} รายการ)`);
     setFlexPreviewOpen(true);
@@ -731,7 +737,7 @@ function ReorderPage() {
       barcode: i.barcode,
     }));
     const flexMsg = createPurchaseOrderFlexBubble(items, {
-      storeName: "ร้าน MiniMark",
+      storeName: currentStoreName,
       orderNumber: po.orderNumber,
       note: `ใบสั่งซื้อ #${po.orderNumber}`,
     });
@@ -815,8 +821,8 @@ function ReorderPage() {
           unitName: getUnitName(p.unitId),
           status: (p.stock <= 0 ? "OUT_OF_STOCK" : "LOW_STOCK") as "OUT_OF_STOCK" | "LOW_STOCK",
         }));
-        flexMsg = createStockAlertFlexBubble(alertPayload, { storeName: "ร้าน MiniMark" });
-        plainText = `⚠️ แจ้งเตือนสินค้าต้องสั่งซื้อ ${allReorderNeeded.length} รายการ (ร้าน MiniMark)`;
+        flexMsg = createStockAlertFlexBubble(alertPayload, { storeName: currentStoreName });
+        plainText = `⚠️ แจ้งเตือนสินค้าต้องสั่งซื้อ ${allReorderNeeded.length} รายการ (${currentStoreName})`;
       } else {
         if (fullItems.length === 0) {
           setIsSending(false);
@@ -824,8 +830,8 @@ function ReorderPage() {
           return;
         }
         const orderDateStr = new Date().toLocaleDateString("th-TH");
-        flexMsg = formatDailyOrderFlexMessage(fullItems, orderDateStr);
-        plainText = formatOrderPlainText(fullItems, orderDateStr);
+        flexMsg = formatDailyOrderFlexMessage(fullItems, orderDateStr, currentStoreName);
+        plainText = formatOrderPlainText(fullItems, orderDateStr, currentStoreName);
       }
 
       // Directly trigger Native LINE LIFF shareTargetPicker with REAL Flex Message
@@ -866,14 +872,14 @@ function ReorderPage() {
   const handleOpenWebShareIntent = () => {
     let plainText = "";
     if (pushMessageType === "STOCK_ALERT") {
-      let text = `⚠️ แจ้งเตือนสต็อกสินค้าต้องสั่งซื้อ — ร้าน MiniMark\n────────────────────\n`;
+      let text = `⚠️ แจ้งเตือนสต็อกสินค้าต้องสั่งซื้อ — ${currentStoreName}\n────────────────────\n`;
       allReorderNeeded.forEach((item, index) => {
         text += `${index + 1}. ${item.name} ➔ เหลือ ${item.stock} ${getUnitName(item.unitId)}\n`;
       });
       plainText = text;
     } else {
       const orderDateStr = new Date().toLocaleDateString("th-TH");
-      plainText = formatOrderPlainText(fullItems, orderDateStr);
+      plainText = formatOrderPlainText(fullItems, orderDateStr, currentStoreName);
     }
 
     const url = `https://line.me/R/share?text=${encodeURIComponent(plainText)}`;
@@ -929,8 +935,8 @@ function ReorderPage() {
           unitName: getUnitName(p.unitId),
           status: (p.stock <= 0 ? "OUT_OF_STOCK" : "LOW_STOCK") as "OUT_OF_STOCK" | "LOW_STOCK",
         }));
-        const flexMsg = createStockAlertFlexBubble(alertPayload, { storeName: "ร้าน MiniMark" });
-        const plainText = `⚠️ แจ้งเตือนสินค้าต้องสั่งซื้อ ${allReorderNeeded.length} รายการ (ร้าน MiniMark)`;
+        const flexMsg = createStockAlertFlexBubble(alertPayload, { storeName: currentStoreName });
+        const plainText = `⚠️ แจ้งเตือนสินค้าต้องสั่งซื้อ ${allReorderNeeded.length} รายการ (${currentStoreName})`;
 
         if (tokenToUse || serverConfig?.hasAccessToken) {
           const res = await sendWith3TierFallback({
@@ -1718,7 +1724,7 @@ function ReorderPage() {
                       <div className="font-bold text-sm text-foreground">
                         📦 ใบสั่งซื้อสินค้าประจำวัน
                       </div>
-                      <span className="text-[11px] text-muted-foreground">ร้าน MiniMark</span>
+                      <span className="text-[11px] text-muted-foreground">{currentStoreName}</span>
                     </div>
 
                     <div className="space-y-1.5 text-xs">
@@ -2203,7 +2209,7 @@ function ReorderPage() {
               <div className="flex items-start justify-between border-b pb-4">
                 <div>
                   <h2 className="text-lg font-bold tracking-tight text-gray-900">
-                    ร้าน MiniMark (มินิมาร์ท โชว์ห่วย)
+                    {currentStoreName}
                   </h2>
                   <p className="text-gray-600 text-[11px] mt-0.5">
                     123/45 ถนนพัฒนาการ แขวงสวนหลวง กรุงเทพฯ 10250
@@ -3175,7 +3181,7 @@ function ReorderPage() {
                       ? "⚠️ แจ้งเตือนสินค้าต้องสั่งซื้อ"
                       : "📦 ใบสั่งซื้อสินค้าประจำวัน"}
                   </span>
-                  <span className="text-[11px] text-muted-foreground">ร้าน MiniMark</span>
+                  <span className="text-[11px] text-muted-foreground">{currentStoreName}</span>
                 </div>
 
                 <div className="space-y-1">

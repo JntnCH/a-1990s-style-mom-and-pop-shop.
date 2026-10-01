@@ -28,6 +28,7 @@ import {
   printOrderAsPDF,
   type ExportOrderPayload,
 } from "@/lib/order-export";
+import { DEFAULT_STORE_NAME, getSystemStoreName } from "@/lib/flex-templates";
 
 interface OrderExportDialogProps {
   open: boolean;
@@ -41,7 +42,8 @@ export function OrderExportDialog({ open, onOpenChange, orderPayload }: OrderExp
   if (!orderPayload) return null;
 
   const handleCopyText = () => {
-    let txt = `📦 ใบสั่งซื้อสินค้า ${orderPayload.orderNumber} (${orderPayload.storeName || "ร้าน MiniMark"})\n`;
+    const store = getSystemStoreName(orderPayload.storeName);
+    let txt = `📦 ใบสั่งซื้อสินค้า ${orderPayload.orderNumber} (${store})\n`;
     txt += `วันที่: ${orderPayload.createdAt}\n`;
     txt += `ซัพพลายเออร์: ${orderPayload.supplierName || "ทั่วไป"}\n`;
     txt += `--------------------\n`;

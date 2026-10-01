@@ -71,6 +71,8 @@ import {
   createMiniAppPortalFlexBubble,
   createPurchaseOrderFlexBubble,
   createStockAlertFlexBubble,
+  DEFAULT_STORE_NAME,
+  getSystemStoreName,
 } from "@/lib/flex-templates";
 import {
   getLineFollowersHistoryFn,
@@ -371,7 +373,7 @@ function SettingsPage() {
         },
         { name: "เลย์ มันฝรั่งทอดกรอบ รสคลาสสิค", quantity: 20, unitName: "ซอง", costPrice: 17.5 },
       ],
-      { storeName: "ร้าน MiniMark", note: "ใบสั่งซื้อสินค้าประจำวัน (ตัวอย่าง)" },
+      { storeName: getSystemStoreName(), note: "ใบสั่งซื้อสินค้าประจำวัน (ตัวอย่าง)" },
     );
     setPreviewFlexTitle("ใบสั่งซื้อสินค้า (purchase-order-flex.ts)");
     setPreviewFlexJson(bubble);
@@ -396,7 +398,7 @@ function SettingsPage() {
           status: "OUT_OF_STOCK",
         },
       ],
-      { storeName: "ร้าน MiniMark", title: "แจ้งเตือนสินค้าใกล้หมด / หมดสต็อก" },
+      { storeName: getSystemStoreName(), title: "แจ้งเตือนสินค้าใกล้หมด / หมดสต็อก" },
     );
     setPreviewFlexTitle("แจ้งเตือนสินค้าสต็อกต่ำ (stock-alert-flex.ts)");
     setPreviewFlexJson(bubble);
@@ -413,7 +415,7 @@ function SettingsPage() {
         totalEstimatedCost: 1450.0,
         reorderCount: 2,
       },
-      { storeName: "ร้าน MiniMark" },
+      { storeName: getSystemStoreName() },
     );
     setPreviewFlexTitle("สรุปยอดสต็อกประจำวัน (daily-summary-flex.ts)");
     setPreviewFlexJson(bubble);
@@ -451,7 +453,7 @@ function SettingsPage() {
       return;
     }
     const bubble = createMiniAppPortalFlexBubble({
-      storeName: "ร้าน MiniMark",
+      storeName: getSystemStoreName(),
       liffId,
     });
     const res = await shareFlexViaLiffPicker(bubble, "ทดสอบส่งการ์ด Flex Message ผ่าน LIFF");
@@ -473,7 +475,7 @@ function SettingsPage() {
   const handlePreviewPortalFlex = () => {
     const liffId = clientLiffId || "2007000000-xxxxxx";
     const bubble = createMiniAppPortalFlexBubble({
-      storeName: "ร้าน MiniMark",
+      storeName: getSystemStoreName(),
       liffId,
     });
     setPreviewFlexTitle("การ์ดทางเข้า Mini App (mini-app-portal-flex.ts)");
@@ -489,7 +491,7 @@ function SettingsPage() {
         data: {
           toUserId: targetUserId,
           isBroadcast,
-          storeName: "ร้าน MiniMark",
+          storeName: getSystemStoreName(),
           liffId: clientLiffId || undefined,
         },
       });

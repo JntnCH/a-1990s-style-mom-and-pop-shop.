@@ -9,7 +9,9 @@ import {
   createDailySummaryFlexBubble,
   createPurchaseOrderFlexBubble,
   createStockAlertFlexBubble,
+  DEFAULT_STORE_NAME,
   type FlexStockAlertItem,
+  getSystemStoreName,
 } from "./flex-templates";
 import { getLineServerConfigFn, sendLineMessagingApiFn } from "./line-server-fn";
 
@@ -218,7 +220,7 @@ export async function getLineStatus(): Promise<LineConfigStatus> {
 export function buildOrderFlexMessage(
   orders: LineOrderItem[],
   note: string = "ใบสั่งซื้อสินค้าประจำวัน",
-  storeName: string = "ร้าน MiniMark",
+  storeName: string = DEFAULT_STORE_NAME,
 ) {
   const items = orders.map((o) => ({
     name: o.product.name,
@@ -229,9 +231,10 @@ export function buildOrderFlexMessage(
   }));
 
   const liffId = getClientLiffId() || undefined;
+  const resolvedStoreName = getSystemStoreName(storeName);
 
   return createPurchaseOrderFlexBubble(items, {
-    storeName,
+    storeName: resolvedStoreName,
     note,
     liffId,
   });
@@ -242,13 +245,14 @@ export function buildOrderFlexMessage(
  */
 export function buildOrderPlainText(
   orders: LineOrderItem[],
-  storeName: string = "ร้าน MiniMark",
+  storeName: string = DEFAULT_STORE_NAME,
 ): string {
+  const resolvedStoreName = getSystemStoreName(storeName);
   const now = new Date();
   const dateStr = now.toLocaleDateString("th-TH");
   const timeStr = now.toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" });
 
-  let text = `📦 ใบสั่งซื้อสินค้าประจำวัน — ${storeName}\n`;
+  let text = `📦 ใบสั่งซื้อสินค้าประจำวัน — ${resolvedStoreName}\n`;
   text += `📅 วันที่: ${dateStr} เวลา ${timeStr} น.\n`;
   text += `────────────────────\n`;
   text += `รายการสินค้า (รายการ -> จำนวน -> หน่วยนับ):\n`;
@@ -263,7 +267,7 @@ export function buildOrderPlainText(
   text += `────────────────────\n`;
   text += `รวมสินค้า: ${totalItems} หน่วย\n`;
   text += `ประมาณการค่าใช้จ่าย: ฿${totalCost.toLocaleString("th-TH", { minimumFractionDigits: 2 })}\n`;
-  text += `ส่งจากระบบ MiniMark`;
+  text += `ส่งจากระบบ ${resolvedStoreName}`;
 
   return text;
 }
@@ -293,7 +297,7 @@ export interface LineShareResult {
  */
 export async function shareFlexViaLiffPicker(
   flexMessage: unknown,
-  altSummary: string = "รายการสั่งซื้อสินค้า MiniMark",
+  altSummary: string = `รายการสั่งซื้อสินค้า ${DEFAULT_STORE_NAME}`,
 ): Promise<{
   success: boolean;
   message: string;
@@ -565,14 +569,15 @@ export async function sendWith3TierFallback(
 export async function sendOrderToLine(
   orders: LineOrderItem[],
   target: LineShareTarget = "group",
-  storeName: string = "ร้าน MiniMark",
+  storeName: string = DEFAULT_STORE_NAME,
 ): Promise<LineShareResult> {
+  const resolvedStoreName = getSystemStoreName(storeName);
   const flex = buildOrderFlexMessage(
     orders,
     `ใบสั่งซื้อประจำวัน (${target === "group" ? "กลุ่ม" : "ส่วนตัว"})`,
-    storeName,
+    resolvedStoreName,
   );
-  const plain = buildOrderPlainText(orders, storeName);
+  const plain = buildOrderPlainText(orders, resolvedStoreName);
 
   return sendWith3TierFallback({
     summary: plain,
@@ -589,7 +594,12 @@ export interface OrderFlexItem {
   priceEstimate?: number;
 }
 
-export function formatDailyOrderFlexMessage(items: OrderFlexItem[], dateStr?: string) {
+export function formatDailyOrderFlexMessage(
+  items: OrderFlexItem[],
+  dateStr?: string,
+  storeName: string = DEFAULT_STORE_NAME,
+) {
+  const resolvedStoreName = getSystemStoreName(storeName);
   const nowStr = new Date().toISOString();
   const lineOrders: LineOrderItem[] = items.map((i) => ({
     product: {
@@ -610,10 +620,19 @@ export function formatDailyOrderFlexMessage(items: OrderFlexItem[], dateStr?: st
     quantity: i.quantity,
     unitName: i.unitName,
   }));
-  return buildOrderFlexMessage(lineOrders, `ใบสั่งซื้อประจำวัน (${dateStr || "วันนี้"})`);
+  return buildOrderFlexMessage(
+    lineOrders,
+    `ใบสั่งซื้อประจำวัน (${dateStr || "วันนี้"})`,
+    resolvedStoreName,
+  );
 }
 
-export function formatOrderPlainText(items: OrderFlexItem[], dateStr?: string): string {
+export function formatOrderPlainText(
+  items: OrderFlexItem[],
+  dateStr?: string,
+  storeName: string = DEFAULT_STORE_NAME,
+): string {
+  const resolvedStoreName = getSystemStoreName(storeName);
   const nowStr = new Date().toISOString();
   const lineOrders: LineOrderItem[] = items.map((i) => ({
     product: {
@@ -634,14 +653,16 @@ export function formatOrderPlainText(items: OrderFlexItem[], dateStr?: string): 
     quantity: i.quantity,
     unitName: i.unitName,
   }));
-  return buildOrderPlainText(lineOrders);
+  return buildOrderPlainText(lineOrders, resolvedStoreName);
 }
 
 export async function sendDailyOrderToLine(
   items: (OrderFlexItem & { product?: ProductItem })[],
   target: LineShareTarget = "group",
   dateStr?: string,
+  storeName: string = DEFAULT_STORE_NAME,
 ): Promise<{ success: boolean; method?: string; error?: string }> {
+  const resolvedStoreName = getSystemStoreName(storeName);
   const nowStr = new Date().toISOString();
   const lineOrders: LineOrderItem[] = items.map((i) => ({
     product: i.product || {
@@ -663,7 +684,7 @@ export async function sendDailyOrderToLine(
     unitName: i.unitName,
   }));
 
-  const res = await sendOrderToLine(lineOrders, target);
+  const res = await sendOrderToLine(lineOrders, target, resolvedStoreName);
   const result: { success: boolean; method?: string; error?: string } = {
     success: res.success,
     method: res.channel === "liff_picker" ? "share_target_picker" : "web_intent",
@@ -677,18 +698,19 @@ export async function sendDailyOrderToLine(
 export async function sendStockAlertToLine(
   alertItems: FlexStockAlertItem[],
   target: LineShareTarget = "group",
-  storeName: string = "ร้าน MiniMark",
+  storeName: string = DEFAULT_STORE_NAME,
 ): Promise<{ success: boolean; method?: string; error?: string; tier?: number }> {
-  const flexMsg = createStockAlertFlexBubble(alertItems, { storeName });
+  const resolvedStoreName = getSystemStoreName(storeName);
+  const flexMsg = createStockAlertFlexBubble(alertItems, { storeName: resolvedStoreName });
 
-  let text = `⚠️ แจ้งเตือนสต็อกสินค้าต้องสั่งซื้อ — ${storeName}\n`;
+  let text = `⚠️ แจ้งเตือนสต็อกสินค้าต้องสั่งซื้อ — ${resolvedStoreName}\n`;
   text += `────────────────────\n`;
   alertItems.forEach((item, index) => {
     const statusText =
       item.status === "OUT_OF_STOCK" ? "สินค้าหมด (0)" : `เหลือ ${item.stock} ${item.unitName}`;
     text += `${index + 1}. ${item.name} ➔ ${statusText}\n`;
   });
-  text += `────────────────────\nกรุณาเข้าสู่ระบบ MiniMark เพื่อตรวจสอบสต็อก`;
+  text += `────────────────────\nกรุณาเข้าสู่ระบบ ${resolvedStoreName} เพื่อตรวจสอบสต็อก`;
 
   const res = await sendWith3TierFallback({
     summary: text,
