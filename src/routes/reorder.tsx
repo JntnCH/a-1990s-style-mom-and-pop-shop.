@@ -296,6 +296,13 @@ function ReorderPage() {
   }, [calculationStrategy, customMultiplier, orderList.length]);
 
   useEffect(() => {
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.removeItem("minimark_custom_po_flex_json");
+      } catch {
+        // ignore
+      }
+    }
     reloadData();
     getLineStatus()
       .then(setLineStatus)
@@ -510,6 +517,7 @@ function ReorderPage() {
   type FullOrderItem = OrderFlexItem & {
     product: ProductItem;
     barcode: string;
+    costPrice: number;
     priceEstimate: number;
   };
   const fullItems: FullOrderItem[] = orderList
@@ -522,6 +530,7 @@ function ReorderPage() {
         quantity: item.quantity,
         unitName: getUnitName(item.unitId || product.unitId),
         barcode: product.barcode,
+        costPrice: product.costPrice,
         priceEstimate: product.costPrice * item.quantity,
       };
     })
@@ -707,7 +716,7 @@ function ReorderPage() {
   const handlePreviewOrderFlex = () => {
     if (fullItems.length === 0) return;
     const orderDateStr = new Date().toLocaleDateString("th-TH");
-    const flexMsg = formatDailyOrderFlexMessage(fullItems, orderDateStr);
+    const flexMsg = formatDailyOrderFlexMessage(fullItems, orderDateStr, currentStoreName);
     setFlexPreviewData(flexMsg);
     setFlexPreviewTitle(`ใบสั่งซื้อสินค้า (${fullItems.length} รายการ, รวม ${totalQuantity} ชิ้น)`);
     setFlexPreviewOpen(true);
@@ -975,8 +984,8 @@ function ReorderPage() {
       } else {
         if (fullItems.length === 0) return;
         const orderDateStr = new Date().toLocaleDateString("th-TH");
-        const flexMsg = formatDailyOrderFlexMessage(fullItems, orderDateStr);
-        const plainText = formatOrderPlainText(fullItems, orderDateStr);
+        const flexMsg = formatDailyOrderFlexMessage(fullItems, orderDateStr, currentStoreName);
+        const plainText = formatOrderPlainText(fullItems, orderDateStr, currentStoreName);
 
         if (tokenToUse || serverConfig?.hasAccessToken) {
           const res = await sendWith3TierFallback({

@@ -591,6 +591,7 @@ export interface OrderFlexItem {
   quantity: number;
   unitName: string;
   barcode?: string;
+  costPrice?: number;
   priceEstimate?: number;
 }
 
@@ -610,7 +611,7 @@ export function formatDailyOrderFlexMessage(
       categoryId: "",
       zoneId: "",
       unitId: "",
-      costPrice: i.priceEstimate && i.quantity ? i.priceEstimate / i.quantity : 0,
+      costPrice: i.costPrice ?? (i.priceEstimate && i.quantity ? i.priceEstimate / i.quantity : 0),
       sellPrice: 0,
       stock: 0,
       minStock: 0,
@@ -643,7 +644,7 @@ export function formatOrderPlainText(
       categoryId: "",
       zoneId: "",
       unitId: "",
-      costPrice: i.priceEstimate && i.quantity ? i.priceEstimate / i.quantity : 0,
+      costPrice: i.costPrice ?? (i.priceEstimate && i.quantity ? i.priceEstimate / i.quantity : 0),
       sellPrice: 0,
       stock: 0,
       minStock: 0,

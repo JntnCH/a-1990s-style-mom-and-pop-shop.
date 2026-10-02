@@ -39,39 +39,6 @@ export function createPurchaseOrderFlexBubble(
 ) {
   const storeName = getSystemStoreName(options.storeName);
 
-  // Check if user has saved a custom template in localStorage
-  if (typeof window !== "undefined") {
-    try {
-      const customSaved = localStorage.getItem("minimark_custom_po_flex_json");
-      if (customSaved && customSaved.trim()) {
-        // Dynamically replace legacy hardcoded store name if present in custom template
-        const dynamicJson = customSaved
-          .replace(/ร้าน MiniMark \(มินิมาร์ท โชว์ห่วย\)/g, storeName)
-          .replace(/ร้าน MiniMark/g, storeName)
-          .replace(/MiniMark/g, storeName.replace(/^ร้าน\s*/, ""));
-
-        const parsed = JSON.parse(dynamicJson);
-        if (parsed && typeof parsed === "object") {
-          if (parsed.type === "flex" && parsed.contents) {
-            if (!parsed.altText || parsed.altText.includes("MiniMark")) {
-              parsed.altText = `📦 ใบสั่งซื้อสินค้า - ${storeName}`;
-            }
-            return parsed;
-          }
-          if (parsed.type === "bubble" || parsed.type === "carousel") {
-            return {
-              type: "flex" as const,
-              altText: `📦 ใบสั่งซื้อสินค้า - ${storeName}`,
-              contents: parsed,
-            };
-          }
-        }
-      }
-    } catch {
-      // fallback to default generator
-    }
-  }
-
   const now = new Date();
   const dateStr =
     options.dateStr ||
@@ -96,8 +63,11 @@ export function createPurchaseOrderFlexBubble(
   const dashboardUrl = `${baseUrl}`;
   const reorderUrl = `${baseUrl}/reorder`;
 
-  const totalItems = items.reduce((sum, o) => sum + o.quantity, 0);
-  const totalCost = items.reduce((sum, o) => sum + o.quantity * (o.costPrice || 0), 0);
+  const totalQuantity = items.reduce((sum, o) => sum + (Number(o.quantity) || 0), 0);
+  const totalCost = items.reduce(
+    (sum, o) => sum + (Number(o.quantity) || 0) * (Number(o.costPrice) || 0),
+    0,
+  );
 
   const itemRows = items.map((item, index) => ({
     type: "box" as const,
@@ -127,7 +97,7 @@ export function createPurchaseOrderFlexBubble(
 
   return {
     type: "flex" as const,
-    altText: `📦 ${storeName} — ${cleanNote} (${totalItems} รายการ)`,
+    altText: `📦 ${storeName} — ${cleanNote} (${items.length} รายการ, รวม ${totalQuantity} หน่วย)`,
     contents: {
       type: "bubble" as const,
       size: "mega" as const,
@@ -237,17 +207,17 @@ export function createPurchaseOrderFlexBubble(
                 text: "รวมจำนวนสินค้าทั้งหมด",
                 size: "sm" as const,
                 color: "#374151",
-                flex: 6,
+                flex: 5,
                 wrap: true,
               },
               {
                 type: "text" as const,
-                text: `${totalItems} รายการ`,
+                text: `${items.length} รายการ (${totalQuantity} หน่วย)`,
                 size: "sm" as const,
                 weight: "bold" as const,
                 color: "#111827",
                 align: "end" as const,
-                flex: 4,
+                flex: 5,
                 wrap: true,
               },
             ],
