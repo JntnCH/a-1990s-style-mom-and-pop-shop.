@@ -34,6 +34,7 @@ export interface ExportOrderItem {
   unitName: string;
   costPrice: number;
   total: number;
+  note?: string;
 }
 
 export interface ExportOrderPayload {
@@ -80,6 +81,7 @@ export function OrderExportModal({ open, onOpenChange, payload }: OrderExportMod
         "หน่วยนับ",
         "ราคาทุนต่อหน่วย (บาท)",
         "ยอดรวม (บาท)",
+        "หมายเหตุ",
       ];
 
       const rows = payload.items.map((item, idx) => [
@@ -96,6 +98,7 @@ export function OrderExportModal({ open, onOpenChange, payload }: OrderExportMod
         `"${item.unitName}"`,
         item.costPrice.toFixed(2),
         item.total.toFixed(2),
+        `"${(item.note || "").replace(/"/g, '""')}"`,
       ]);
 
       // Summary row
@@ -113,6 +116,7 @@ export function OrderExportModal({ open, onOpenChange, payload }: OrderExportMod
         `"ชิ้น"`,
         "",
         payload.totalCost.toFixed(2),
+        "",
       ]);
 
       const csvContent = "\uFEFF" + [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
@@ -473,7 +477,14 @@ ${payload.items.map((it, idx) => `${idx + 1}. ${it.productName} ➔ ${it.quantit
                     {payload.items.map((item, idx) => (
                       <tr key={idx} className="text-gray-800">
                         <td className="p-2.5 text-center text-gray-500 font-mono">{idx + 1}</td>
-                        <td className="p-2.5 font-medium">{item.productName}</td>
+                        <td className="p-2.5 font-medium">
+                          <div>{item.productName}</div>
+                          {item.note && (
+                            <div className="text-[10px] text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded mt-0.5 inline-block font-normal">
+                              📌 {item.note}
+                            </div>
+                          )}
+                        </td>
                         <td className="p-2.5 font-mono text-[11px] text-gray-500">
                           {item.barcode}
                         </td>

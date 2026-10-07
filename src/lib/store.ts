@@ -90,8 +90,10 @@ export interface PurchaseOrderRecord {
     barcode: string;
     quantity: number;
     unitName: string;
+    unitId?: string | undefined;
     costPrice: number;
     total: number;
+    note?: string | undefined;
   }[];
   totalQuantity: number;
   totalCost: number;
