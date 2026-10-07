@@ -112,6 +112,7 @@ import {
 } from "@/lib/line-service";
 import { playScanSuccessSound } from "@/lib/scanner-audio";
 import { PrinterService } from "@/lib/printer-service";
+import { generateStoreBarcode } from "@/lib/barcode-engine";
 import {
   MasterStore,
   type CategoryItem,
@@ -286,6 +287,20 @@ function ReorderPage() {
   const [flexSimulatorModalOpen, setFlexSimulatorModalOpen] = useState(false);
   const currentStoreName = getSystemStoreName();
 
+  // Quick Add Product Directly Inside Purchase Order
+  const [quickAddModalOpen, setQuickAddModalOpen] = useState(false);
+  const [quickName, setQuickName] = useState("");
+  const [quickBarcode, setQuickBarcode] = useState("");
+  const [quickSku, setQuickSku] = useState("");
+  const [quickCatId, setQuickCatId] = useState("");
+  const [quickZoneId, setQuickZoneId] = useState("");
+  const [quickUnitId, setQuickUnitId] = useState("");
+  const [quickCostPrice, setQuickCostPrice] = useState<number>(0);
+  const [quickSellPrice, setQuickSellPrice] = useState<number>(0);
+  const [quickOrderQty, setQuickOrderQty] = useState<number>(10);
+  const [quickFormError, setQuickFormError] = useState("");
+  const [hasRestoredDraft, setHasRestoredDraft] = useState(false);
+
   const reloadData = useCallback(() => {
     const allProds = MasterStore.getProducts();
     const allCats = MasterStore.getCategories();
@@ -301,8 +316,16 @@ function ReorderPage() {
     setFollowers(allFollowers);
     setPurchaseOrders(allPOs);
 
-    // Default populate order list from low stock items if empty
-    if (orderList.length === 0) {
+    // 1. Check if a saved draft exists
+    const draft = MasterStore.getDraftPurchaseOrder();
+    if (draft && draft.orderList && draft.orderList.length > 0) {
+      setOrderList(draft.orderList);
+      if (draft.supplierName) setSupplierNameInput(draft.supplierName);
+      if (draft.calculationStrategy) {
+        setCalculationStrategy(draft.calculationStrategy as ReorderStrategy);
+      }
+      setHasRestoredDraft(true);
+    } else if (orderList.length === 0) {
       const lowStockItems = allProds.filter((p) => p.isActive !== false && p.stock <= p.minStock);
       setOrderList(
         lowStockItems.map((p) => {
@@ -320,6 +343,87 @@ function ReorderPage() {
       );
     }
   }, [calculationStrategy, customMultiplier, orderList.length]);
+
+  // Auto-save draft PO whenever orderList or supplierNameInput changes
+  useEffect(() => {
+    if (orderList.length > 0) {
+      MasterStore.saveDraftPurchaseOrder({
+        orderList,
+        supplierName: supplierNameInput,
+        calculationStrategy,
+      });
+    }
+  }, [orderList, supplierNameInput, calculationStrategy]);
+
+  const handleClearDraft = () => {
+    MasterStore.clearDraftPurchaseOrder();
+    setOrderList([]);
+    setHasRestoredDraft(false);
+    toast.info("ล้างแบบร่างใบสั่งซื้อเรียบร้อยแล้ว");
+  };
+
+  const handleSaveQuickAddProduct = () => {
+    if (!quickName.trim()) {
+      setQuickFormError("กรุณาระบุชื่อสินค้า");
+      return;
+    }
+    const finalBarcode = quickBarcode.trim() || generateStoreBarcode("EAN_13");
+    const finalSku = quickSku.trim() || `SKU-${Date.now().toString().slice(-6)}`;
+    const finalCat = quickCatId || categories[0]?.id || "cat-general";
+    const finalUnit = quickUnitId || units[0]?.id || "unit-piece";
+
+    if (MasterStore.checkDuplicateBarcode(finalBarcode)) {
+      setQuickFormError(`บาร์โค้ด ${finalBarcode} มีอยู่ในระบบแล้ว`);
+      return;
+    }
+
+    const newProd = MasterStore.addProduct({
+      sku: finalSku,
+      barcode: finalBarcode,
+      codeType: "Barcode",
+      format: "EAN_13",
+      name: quickName.trim(),
+      categoryId: finalCat,
+      zoneId: quickZoneId || undefined,
+      unitId: finalUnit,
+      costPrice: Number(quickCostPrice) || 0,
+      sellPrice: Number(quickSellPrice) || 0,
+      stock: 0,
+      minStock: 5,
+      targetStock: 15,
+      reorderQuantity: Number(quickOrderQty) || 10,
+      isActive: true,
+    });
+
+    // Immediately add to current order list
+    const qty = Math.max(1, Number(quickOrderQty) || 10);
+    setOrderList((prev) => [
+      {
+        productId: newProd.id,
+        quantity: qty,
+        unitId: newProd.unitId,
+        costPrice: newProd.costPrice,
+      },
+      ...prev,
+    ]);
+
+    // Update local products list
+    setProducts(MasterStore.getProducts());
+    setQuickAddModalOpen(false);
+    setAddModalOpen(false);
+    // Reset quick form
+    setQuickName("");
+    setQuickBarcode("");
+    setQuickSku("");
+    setQuickCostPrice(0);
+    setQuickSellPrice(0);
+    setQuickOrderQty(10);
+    setQuickFormError("");
+
+    toast.success(
+      `เพิ่มสินค้าใหม่ "${newProd.name}" และใส่ลงในใบสั่งซื้อ (${qty} ${MasterStore.getUnitName(newProd.unitId)}) เรียบร้อยแล้ว`,
+    );
+  };
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -347,8 +451,8 @@ function ReorderPage() {
     return () => window.removeEventListener("minimark_store_change", onStoreChange);
   }, [reloadData]);
 
-  const getUnitName = (unitId: string) => units.find((u) => u.id === unitId)?.name || "ชิ้น";
-  const getCatName = (catId: string) => categories.find((c) => c.id === catId)?.name || "ทั่วไป";
+  const getUnitName = (unitId: string) => MasterStore.getUnitName(unitId);
+  const getCatName = (catId: string) => MasterStore.getCategoryName(catId);
 
   // Categorized alerts
   const outOfStockItems = products.filter((p) => p.isActive !== false && p.stock <= 0);
@@ -1566,6 +1670,27 @@ function ReorderPage() {
 
         {/* TAB 2: CREATE PURCHASE ORDER & LINE FLEX (PHASE 6) */}
         <TabsContent value="create_po" className="space-y-4">
+          {/* DRAFT RECOVERY BANNER */}
+          {hasRestoredDraft && orderList.length > 0 && (
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 rounded-2xl bg-amber-500/10 border border-amber-500/25 text-xs text-amber-800 dark:text-amber-300 shadow-2xs animate-in fade-in">
+              <div className="flex items-center gap-2">
+                <ClipboardCheck className="size-4 shrink-0 text-amber-600" />
+                <span>
+                  <strong>กู้คืนแบบร่างอัตโนมัติ:</strong> กำลังแสดงรายการที่จดบันทึกค้างไว้ (
+                  {orderList.length} รายการ) ป้องกันข้อมูลสูญหาย
+                </span>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 text-xs text-destructive hover:bg-destructive/10 px-2.5 font-medium shrink-0 rounded-lg self-end sm:self-auto"
+                onClick={handleClearDraft}
+              >
+                <Trash2 className="size-3 mr-1" /> ล้างแบบร่าง / เริ่มใบใหม่
+              </Button>
+            </div>
+          )}
+
           <div className="grid gap-4 sm:gap-6 lg:grid-cols-12">
             {/* REORDER ITEMS LIST */}
             <div className="lg:col-span-7 space-y-3">
@@ -1582,12 +1707,30 @@ function ReorderPage() {
                       onChange={(e) => setSupplierNameInput(e.target.value)}
                     />
                   </div>
-                  <Button
-                    onClick={handleOpenAddModal}
-                    className="h-10 rounded-xl font-semibold gap-1.5 bg-primary hover:bg-primary/90 text-primary-foreground shrink-0 shadow-xs active:scale-95"
-                  >
-                    <Plus className="size-4" /> เพิ่มสินค้าในใบสั่ง
-                  </Button>
+                  <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+                    <Button
+                      onClick={handleOpenAddModal}
+                      variant="outline"
+                      className="h-10 rounded-xl font-semibold gap-1.5 shrink-0 shadow-2xs active:scale-95 text-xs"
+                    >
+                      <Plus className="size-4" /> เลือกสินค้าเดิม
+                    </Button>
+                    <Button
+                      onClick={() => {
+                        setQuickName("");
+                        setQuickBarcode("");
+                        setQuickSku("");
+                        setQuickCostPrice(0);
+                        setQuickSellPrice(0);
+                        setQuickOrderQty(10);
+                        setQuickFormError("");
+                        setQuickAddModalOpen(true);
+                      }}
+                      className="h-10 rounded-xl font-semibold gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white shrink-0 shadow-xs active:scale-95 text-xs"
+                    >
+                      <PackagePlus className="size-4" /> + เพิ่มสินค้าใหม่ด่วน
+                    </Button>
+                  </div>
                 </div>
               </Card>
 
@@ -1597,13 +1740,23 @@ function ReorderPage() {
                   <span className="text-xs font-semibold text-muted-foreground">
                     รายการสินค้าที่ต้องสั่ง ({fullItems.length})
                   </span>
-                  <Button
-                    size="sm"
-                    onClick={handleOpenAddModal}
-                    className="h-8 text-xs font-semibold gap-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg shadow-xs"
-                  >
-                    <Plus className="size-3.5" /> เพิ่มรายการเอง
-                  </Button>
+                  <div className="flex items-center gap-1.5">
+                    <Button
+                      size="sm"
+                      onClick={() => setQuickAddModalOpen(true)}
+                      className="h-8 text-xs font-semibold gap-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg shadow-xs"
+                    >
+                      <PackagePlus className="size-3.5" /> + สินค้าใหม่
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={handleOpenAddModal}
+                      className="h-8 text-xs font-semibold gap-1 rounded-lg"
+                    >
+                      <Plus className="size-3.5" /> เลือกสินค้า
+                    </Button>
+                  </div>
                 </div>
 
                 {fullItems.length === 0 ? (
@@ -1789,6 +1942,23 @@ function ReorderPage() {
                     </CardDescription>
                   </div>
                   <div className="flex items-center gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        setQuickName("");
+                        setQuickBarcode("");
+                        setQuickSku("");
+                        setQuickCostPrice(0);
+                        setQuickSellPrice(0);
+                        setQuickOrderQty(10);
+                        setQuickFormError("");
+                        setQuickAddModalOpen(true);
+                      }}
+                      className="h-9 px-3 rounded-xl text-xs font-semibold gap-1.5 border-emerald-500/40 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-950/30"
+                    >
+                      <PackagePlus className="size-4 text-emerald-600" /> + เพิ่มสินค้าใหม่ด่วน
+                    </Button>
                     <Button
                       size="sm"
                       onClick={handleOpenAddModal}
@@ -2780,31 +2950,71 @@ function ReorderPage() {
 
               {/* Product Select Box */}
               {availableProductsForAdd.length === 0 ? (
-                <div className="p-4 text-center text-xs text-muted-foreground border rounded-xl bg-card">
-                  ไม่พบสินค้าในโซน/หมวดหมู่นี้ ลองเปลี่ยนเงื่อนไขการค้นหา
+                <div className="p-4 text-center text-xs text-muted-foreground border rounded-xl bg-card space-y-2">
+                  <p>ไม่พบสินค้าตามเงื่อนไขที่เลือก</p>
+                  <Button
+                    type="button"
+                    size="sm"
+                    className="h-8 text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg gap-1.5"
+                    onClick={() => {
+                      setAddModalOpen(false);
+                      setQuickName(addProductSearch || "");
+                      setQuickBarcode("");
+                      setQuickSku("");
+                      setQuickCostPrice(0);
+                      setQuickSellPrice(0);
+                      setQuickOrderQty(10);
+                      setQuickFormError("");
+                      setQuickAddModalOpen(true);
+                    }}
+                  >
+                    <PackagePlus className="size-4" /> + เพิ่มสินค้านี้เข้าระบบทันที
+                  </Button>
                 </div>
               ) : (
-                <select
-                  className="w-full rounded-xl border border-input bg-background px-3 py-2 text-xs sm:text-sm shadow-xs font-medium"
-                  value={selectedProdId || availableProductsForAdd[0]?.id || ""}
-                  onChange={(e) => {
-                    const newId = e.target.value;
-                    setSelectedProdId(newId);
-                    const p = products.find((prod) => prod.id === newId);
-                    if (p) {
-                      setManualQty(p.reorderQuantity || 10);
-                      setManualUnitId(p.unitId);
-                      setManualCostPrice(p.costPrice);
-                    }
-                  }}
-                >
-                  {availableProductsForAdd.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.name} • สต็อก: {p.stock} {getUnitName(p.unitId)} (ทุน ฿
-                      {p.costPrice.toFixed(2)})
-                    </option>
-                  ))}
-                </select>
+                <div className="space-y-1.5">
+                  <select
+                    className="w-full rounded-xl border border-input bg-background px-3 py-2 text-xs sm:text-sm shadow-xs font-medium"
+                    value={selectedProdId || availableProductsForAdd[0]?.id || ""}
+                    onChange={(e) => {
+                      const newId = e.target.value;
+                      setSelectedProdId(newId);
+                      const p = products.find((prod) => prod.id === newId);
+                      if (p) {
+                        setManualQty(p.reorderQuantity || 10);
+                        setManualUnitId(p.unitId);
+                        setManualCostPrice(p.costPrice);
+                      }
+                    }}
+                  >
+                    {availableProductsForAdd.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name} • สต็อก: {p.stock} {getUnitName(p.unitId)} (ทุน ฿
+                        {p.costPrice.toFixed(2)})
+                      </option>
+                    ))}
+                  </select>
+                  <div className="flex items-center justify-between text-[11px] pt-0.5">
+                    <span className="text-muted-foreground">ไม่พบสินค้าที่ต้องการ?</span>
+                    <button
+                      type="button"
+                      className="text-emerald-700 dark:text-emerald-400 font-semibold hover:underline flex items-center gap-1"
+                      onClick={() => {
+                        setAddModalOpen(false);
+                        setQuickName(addProductSearch || "");
+                        setQuickBarcode("");
+                        setQuickSku("");
+                        setQuickCostPrice(0);
+                        setQuickSellPrice(0);
+                        setQuickOrderQty(10);
+                        setQuickFormError("");
+                        setQuickAddModalOpen(true);
+                      }}
+                    >
+                      <PackagePlus className="size-3" /> + เพิ่มสินค้าใหม่ด่วน
+                    </button>
+                  </div>
+                </div>
               )}
 
               {/* Selected Product Card Preview & Detailed Form */}
@@ -3992,6 +4202,164 @@ function ReorderPage() {
               }}
             />
           </div>
+        </DialogContent>
+      </Dialog>
+      {/* QUICK ADD PRODUCT DIALOG (Direct Inside Purchase Order) */}
+      <Dialog open={quickAddModalOpen} onOpenChange={setQuickAddModalOpen}>
+        <DialogContent className="w-[96vw] max-w-xl rounded-2xl p-5 max-h-[92vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-base sm:text-lg flex items-center gap-2 text-foreground font-bold">
+              <PackagePlus className="size-5 text-emerald-600" />
+              เพิ่มสินค้าใหม่เข้าสต็อก &amp; ใส่ในใบสั่งซื้อทันที
+            </DialogTitle>
+            <DialogDescription className="text-xs text-muted-foreground">
+              เพิ่มสินค้าใหม่ลงในระบบโดยไม่ต้องออกจากหน้าใบสั่งซื้อ ข้อมูลที่กำลังจัดทำจะไม่สูญหาย
+            </DialogDescription>
+          </DialogHeader>
+
+          {quickFormError && (
+            <Alert variant="destructive" className="py-2 text-xs rounded-xl">
+              <AlertCircle className="size-4" />
+              <AlertDescription>{quickFormError}</AlertDescription>
+            </Alert>
+          )}
+
+          <div className="space-y-3.5 pt-1 text-xs">
+            {/* Product Name */}
+            <div className="space-y-1">
+              <Label className="text-xs font-semibold">ชื่อสินค้า *</Label>
+              <Input
+                placeholder="เช่น นมถั่วเหลืองไวตามิ้ลค์ 300ml, มาม่าต้มยำกุ้ง"
+                value={quickName}
+                onChange={(e) => setQuickName(e.target.value)}
+                className="h-10 rounded-xl text-sm"
+                autoFocus
+              />
+            </div>
+
+            {/* Barcode & SKU */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs font-semibold">บาร์โค้ดสินค้า</Label>
+                  <button
+                    type="button"
+                    className="text-[11px] text-primary hover:underline font-medium"
+                    onClick={() => setQuickBarcode(generateStoreBarcode("EAN_13"))}
+                  >
+                    ⚡ สุ่มบาร์โค้ด
+                  </button>
+                </div>
+                <Input
+                  placeholder="สแกนหรือเว้นว่างเพื่อสร้างอัตโนมัติ"
+                  value={quickBarcode}
+                  onChange={(e) => setQuickBarcode(e.target.value)}
+                  className="h-9 font-mono text-xs rounded-xl"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <Label className="text-xs font-semibold">รหัส SKU</Label>
+                <Input
+                  placeholder="เช่น SKU-BEV-001"
+                  value={quickSku}
+                  onChange={(e) => setQuickSku(e.target.value)}
+                  className="h-9 font-mono text-xs rounded-xl"
+                />
+              </div>
+            </div>
+
+            {/* Category & Unit & Zone */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="space-y-1">
+                <Label className="text-xs font-semibold">หมวดหมู่สินค้า *</Label>
+                <CategorySelect
+                  value={quickCatId}
+                  onChange={setQuickCatId}
+                  placeholder="เลือกหมวดหมู่"
+                  className="h-9 text-xs rounded-xl"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <Label className="text-xs font-semibold">หน่วยนับ *</Label>
+                <UnitSelect
+                  value={quickUnitId}
+                  onChange={setQuickUnitId}
+                  placeholder="เลือกหน่วยนับ"
+                  className="h-9 text-xs rounded-xl"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <Label className="text-xs font-semibold">โซนจัดเก็บ</Label>
+                <ZoneSelect
+                  value={quickZoneId}
+                  onChange={setQuickZoneId}
+                  placeholder="เลือกโซน"
+                  className="h-9 text-xs rounded-xl"
+                />
+              </div>
+            </div>
+
+            {/* Cost, Sell Price, Initial PO Qty */}
+            <div className="grid grid-cols-3 gap-3 p-3 bg-muted/40 rounded-xl border">
+              <div className="space-y-1">
+                <Label className="text-xs font-semibold">ราคาทุน (฿)</Label>
+                <Input
+                  type="number"
+                  min="0"
+                  step="0.5"
+                  value={quickCostPrice}
+                  onChange={(e) => setQuickCostPrice(Number(e.target.value) || 0)}
+                  className="h-9 font-mono text-xs rounded-xl bg-background"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <Label className="text-xs font-semibold">ราคาขาย (฿)</Label>
+                <Input
+                  type="number"
+                  min="0"
+                  step="0.5"
+                  value={quickSellPrice}
+                  onChange={(e) => setQuickSellPrice(Number(e.target.value) || 0)}
+                  className="h-9 font-mono text-xs rounded-xl bg-background"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <Label className="text-xs font-semibold text-emerald-700 dark:text-emerald-300">
+                  จำนวนสั่งในใบนี้ *
+                </Label>
+                <Input
+                  type="number"
+                  min="1"
+                  value={quickOrderQty}
+                  onChange={(e) => setQuickOrderQty(Math.max(1, Number(e.target.value) || 1))}
+                  className="h-9 font-mono font-bold text-xs rounded-xl bg-background border-emerald-500/40"
+                />
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter className="pt-3 border-t flex flex-col sm:flex-row gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              className="rounded-xl text-xs"
+              onClick={() => setQuickAddModalOpen(false)}
+            >
+              ยกเลิก
+            </Button>
+            <Button
+              type="button"
+              className="rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white gap-1.5 shadow-sm"
+              onClick={handleSaveQuickAddProduct}
+            >
+              <PackagePlus className="size-4" /> บันทึก &amp; บรรจุลงใบสั่งซื้อทันที
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

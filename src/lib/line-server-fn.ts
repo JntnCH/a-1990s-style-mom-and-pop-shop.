@@ -4,6 +4,12 @@ import {
   DEFAULT_STORE_NAME,
   getSystemStoreName,
 } from "./flex-templates";
+import {
+  getDatabaseSnapshot,
+  syncDatabasePayload,
+  type DBProductItem,
+  type DBPurchaseOrder,
+} from "../db/db-service.ts";
 
 export interface SendLineOrderPayload {
   toUserIdOrGroupId?: string | undefined;
@@ -172,6 +178,74 @@ export const getLineServerConfigFn = createServerFn({ method: "GET" }).handler(a
 export const syncMasterDatabaseFn = createServerFn({ method: "POST" })
   .validator((payload: ServerSyncPayload) => payload)
   .handler(async ({ data }) => {
+    // 1. If Cloud SQL credentials are set, sync with PostgreSQL
+    if (process.env.SQL_HOST && process.env.SQL_USER && process.env.SQL_PASSWORD) {
+      try {
+        const sqlSnapshot = await syncDatabasePayload({
+          units: data.units as { id: string; name: string; shortName: string }[] | undefined,
+          categories: data.categories as { id: string; code: string; name: string }[] | undefined,
+          zones: data.zones as
+            | {
+                id: string;
+                code: string;
+                name: string;
+                description?: string;
+              }[]
+            | undefined,
+          products: data.products as DBProductItem[] | undefined,
+          purchaseOrders: data.purchaseOrders as DBPurchaseOrder[] | undefined,
+          movements: data.movements as
+            | {
+                id: string;
+                timestamp: string;
+                productId: string;
+                productName: string;
+                barcode: string;
+                type: string;
+                quantity: number;
+                previousStock: number;
+                newStock: number;
+                operator: string;
+                note?: string;
+              }[]
+            | undefined,
+          receives: data.receives as
+            | {
+                id: string;
+                barcode: string;
+                codeType?: string;
+                format?: string;
+                productName: string;
+                unit: string;
+                quantity: number;
+                scannedAt: string;
+              }[]
+            | undefined,
+          followers: data.followers as ServerLineFollower[] | undefined,
+        });
+
+        globalServerDatabase.products = sqlSnapshot.products;
+        globalServerDatabase.categories = sqlSnapshot.categories;
+        globalServerDatabase.zones = sqlSnapshot.zones;
+        globalServerDatabase.units = sqlSnapshot.units;
+        globalServerDatabase.receives = sqlSnapshot.receives;
+        globalServerDatabase.followers = sqlSnapshot.followers as ServerLineFollower[];
+        globalServerDatabase.movements = sqlSnapshot.movements;
+        globalServerDatabase.purchaseOrders = sqlSnapshot.purchaseOrders;
+        globalServerDatabase.lastUpdated = new Date().toISOString();
+
+        return {
+          success: true,
+          data: sqlSnapshot,
+          lastUpdated: globalServerDatabase.lastUpdated,
+          source: "cloudsql",
+        };
+      } catch (sqlErr) {
+        console.warn("Could not sync directly to Cloud SQL, falling back to memory store:", sqlErr);
+      }
+    }
+
+    // 2. In-memory fallback
     if (data.products && Array.isArray(data.products) && data.products.length > 0) {
       globalServerDatabase.products = data.products;
     }
@@ -216,6 +290,7 @@ export const syncMasterDatabaseFn = createServerFn({ method: "POST" })
       success: true,
       data: globalServerDatabase,
       lastUpdated: globalServerDatabase.lastUpdated,
+      source: "memory",
     };
   });
 

@@ -730,15 +730,12 @@ function ReceiveCheckPage() {
                               >
                                 {units.map((u) => (
                                   <option key={u.id} value={u.name}>
-                                    {u.name}
+                                    {u.name} ({u.shortName})
                                   </option>
                                 ))}
-                                <option value="ชิ้น">ชิ้น</option>
-                                <option value="กล่อง">กล่อง</option>
-                                <option value="ลัง">ลัง</option>
-                                <option value="แพ็ค">แพ็ค</option>
-                                <option value="ถุง">ถุง</option>
-                                <option value="ขวด">ขวด</option>
+                                {!units.some((u) => u.name === item.unit) && (
+                                  <option value={item.unit}>{item.unit}</option>
+                                )}
                               </select>
                             </TableCell>
 

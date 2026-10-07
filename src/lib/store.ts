@@ -423,6 +423,7 @@ export const STORAGE_KEYS = {
   FOLLOWERS: "minimark_followers",
   MOVEMENTS: "minimark_movements",
   PURCHASE_ORDERS: "minimark_purchase_orders",
+  PO_DRAFT: "minimark_po_draft",
 };
 
 function safeGet<T>(key: string, fallback: T): T {
@@ -511,6 +512,35 @@ export const MasterStore = {
   // Units
   getUnits(): UnitItem[] {
     return safeGet<UnitItem[]>(STORAGE_KEYS.UNITS, DEFAULT_UNITS);
+  },
+  getUnitName(unitIdOrName?: string): string {
+    if (!unitIdOrName) return "ชิ้น";
+    const units = this.getUnits();
+    const matched = units.find(
+      (u) =>
+        u.id === unitIdOrName ||
+        u.name === unitIdOrName ||
+        u.shortName === unitIdOrName ||
+        u.id.toLowerCase() === unitIdOrName.toLowerCase() ||
+        u.name.toLowerCase() === unitIdOrName.toLowerCase(),
+    );
+    return matched ? matched.name : unitIdOrName;
+  },
+  getCategoryName(catIdOrName?: string): string {
+    if (!catIdOrName) return "ทั่วไป";
+    const cats = this.getCategories();
+    const matched = cats.find(
+      (c) => c.id === catIdOrName || c.name === catIdOrName || c.code === catIdOrName,
+    );
+    return matched ? matched.name : catIdOrName;
+  },
+  getZoneName(zoneIdOrName?: string): string {
+    if (!zoneIdOrName) return "-";
+    const zones = this.getZones();
+    const matched = zones.find(
+      (z) => z.id === zoneIdOrName || z.name === zoneIdOrName || z.code === zoneIdOrName,
+    );
+    return matched ? matched.name : zoneIdOrName;
   },
   saveUnits(items: UnitItem[]) {
     safeSet(STORAGE_KEYS.UNITS, items);
@@ -849,6 +879,52 @@ export const MasterStore = {
   },
 
   // Purchase Orders (Phase 6 Management & Lifecycle)
+  getDraftPurchaseOrder(): {
+    orderList: {
+      productId: string;
+      quantity: number;
+      unitId: string;
+      costPrice?: number;
+      note?: string;
+    }[];
+    supplierName: string;
+    calculationStrategy?: string;
+    savedAt?: string;
+  } | null {
+    return safeGet(STORAGE_KEYS.PO_DRAFT, null);
+  },
+  saveDraftPurchaseOrder(draft: {
+    orderList: {
+      productId: string;
+      quantity: number;
+      unitId: string;
+      costPrice?: number;
+      note?: string;
+    }[];
+    supplierName: string;
+    calculationStrategy?: string;
+  }): void {
+    safeSet(STORAGE_KEYS.PO_DRAFT, {
+      ...draft,
+      savedAt: new Date().toISOString(),
+    });
+  },
+  clearDraftPurchaseOrder(): void {
+    if (typeof window === "undefined") return;
+    try {
+      localStorage.removeItem(STORAGE_KEYS.PO_DRAFT);
+      window.dispatchEvent(new Event("minimark_store_change"));
+      if (syncChannel) {
+        syncChannel.postMessage({
+          type: "STORE_UPDATED",
+          key: STORAGE_KEYS.PO_DRAFT,
+          timestamp: Date.now(),
+        });
+      }
+    } catch {
+      // ignore
+    }
+  },
   getPurchaseOrders(): PurchaseOrderRecord[] {
     return safeGet<PurchaseOrderRecord[]>(STORAGE_KEYS.PURCHASE_ORDERS, DEFAULT_PURCHASE_ORDERS);
   },

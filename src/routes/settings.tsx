@@ -196,6 +196,25 @@ function SettingsPage() {
       });
 
       if (res.success && res.data) {
+        if (res.data.units && Array.isArray(res.data.units) && res.data.units.length > 0) {
+          MasterStore.saveUnits(res.data.units as UnitItem[]);
+          setUnits(res.data.units as UnitItem[]);
+        }
+        if (
+          res.data.categories &&
+          Array.isArray(res.data.categories) &&
+          res.data.categories.length > 0
+        ) {
+          MasterStore.saveCategories(res.data.categories as CategoryItem[]);
+          setCategories(res.data.categories as CategoryItem[]);
+        }
+        if (res.data.zones && Array.isArray(res.data.zones) && res.data.zones.length > 0) {
+          MasterStore.saveZones(res.data.zones as ZoneItem[]);
+          setZones(res.data.zones as ZoneItem[]);
+        }
+        if (res.data.products && Array.isArray(res.data.products) && res.data.products.length > 0) {
+          MasterStore.saveProducts(res.data.products as ProductItem[]);
+        }
         if (res.data.followers && res.data.followers.length > 0) {
           setFollowers(res.data.followers as LineUserFollower[]);
         }
@@ -235,6 +254,7 @@ function SettingsPage() {
     setZoneModalOpen(false);
     setEditingZone(null);
     setZoneForm({ name: "", code: "", description: "" });
+    void syncWithCentralServer();
   };
 
   const handleEditZone = (item: ZoneItem) => {
@@ -250,6 +270,7 @@ function SettingsPage() {
   const handleDeleteZone = (id: string) => {
     if (confirm("ต้องการลบโซนสินค้านี้ใช่หรือไม่?")) {
       MasterStore.deleteZone(id);
+      void syncWithCentralServer();
     }
   };
 
@@ -264,6 +285,7 @@ function SettingsPage() {
     setCatModalOpen(false);
     setEditingCat(null);
     setCatForm({ name: "", code: "" });
+    void syncWithCentralServer();
   };
 
   const handleEditCategory = (item: CategoryItem) => {
@@ -275,6 +297,7 @@ function SettingsPage() {
   const handleDeleteCategory = (id: string) => {
     if (confirm("ต้องการลบหมวดหมู่นี้ใช่หรือไม่?")) {
       MasterStore.deleteCategory(id);
+      void syncWithCentralServer();
     }
   };
 
@@ -289,6 +312,7 @@ function SettingsPage() {
     setUnitModalOpen(false);
     setEditingUnit(null);
     setUnitForm({ name: "", shortName: "" });
+    void syncWithCentralServer();
   };
 
   const handleEditUnit = (item: UnitItem) => {
@@ -300,6 +324,7 @@ function SettingsPage() {
   const handleDeleteUnit = (id: string) => {
     if (confirm("ต้องการลบหน่วยนับนี้ใช่หรือไม่?")) {
       MasterStore.deleteUnit(id);
+      void syncWithCentralServer();
     }
   };
 
