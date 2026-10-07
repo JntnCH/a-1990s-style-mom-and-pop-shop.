@@ -155,10 +155,10 @@ function ReorderPage() {
   const [followers, setFollowers] = useState<LineUserFollower[]>([]);
   const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrderRecord[]>([]);
 
-  // Active View Tab: "calculator" (Phase 5) | "alerts_hub" (Phase 4) | "create_po" | "po_history" (Phase 6)
+  // Active View Tab: "create_po" (Phase 6) | "po_history" (Phase 6) | "calculator" (Phase 5) | "alerts_hub" (Phase 4)
   const [activeTab, setActiveTab] = useState<
-    "calculator" | "alerts_hub" | "create_po" | "po_history"
-  >("calculator");
+    "create_po" | "po_history" | "calculator" | "alerts_hub"
+  >("create_po");
 
   // Calculation Strategy State (Phase 5)
   const [calculationStrategy, setCalculationStrategy] = useState<ReorderStrategy>("TARGET_PAR");
@@ -177,8 +177,11 @@ function ReorderPage() {
   // Selected Order Items (Cart)
   interface OrderCartItem {
     productId: string;
+    productName?: string;
+    barcode?: string;
     quantity: number;
     unitId: string;
+    unitName?: string;
     costPrice?: number;
     note?: string;
   }
@@ -200,6 +203,7 @@ function ReorderPage() {
 
   // Edit Item Modal State (Detailed Editing)
   const [editItemModalOpen, setEditItemModalOpen] = useState(false);
+  const [updateMasterCostPrice, setUpdateMasterCostPrice] = useState(false);
   const [editingCartItem, setEditingCartItem] = useState<{
     productId: string;
     productName: string;
@@ -329,8 +333,11 @@ function ReorderPage() {
     setUnits(allUnits);
     setFollowers(allFollowers);
     setPurchaseOrders(allPOs);
+  }, []);
 
-    // 1. Check if a saved draft exists
+  // 1. Initial load on mount: Check saved draft or seed low-stock items once
+  useEffect(() => {
+    reloadData();
     const draft = MasterStore.getDraftPurchaseOrder();
     if (draft && draft.orderList && draft.orderList.length > 0) {
       setOrderList(draft.orderList);
@@ -339,28 +346,32 @@ function ReorderPage() {
         setCalculationStrategy(draft.calculationStrategy as ReorderStrategy);
       }
       setHasRestoredDraft(true);
-    } else if (orderList.length === 0) {
+    } else {
+      const allProds = MasterStore.getProducts();
       const lowStockItems = allProds.filter((p) => p.isActive !== false && p.stock <= p.minStock);
-      setOrderList(
-        lowStockItems.map((p) => {
-          const suggested = MasterStore.calculateSuggestedQuantity(
-            p,
-            calculationStrategy,
-            customMultiplier,
-          );
-          return {
+      if (lowStockItems.length > 0) {
+        setOrderList(
+          lowStockItems.map((p) => ({
             productId: p.id,
-            quantity: suggested,
+            productName: p.name,
+            barcode: p.barcode,
+            quantity: MasterStore.calculateSuggestedQuantity(
+              p,
+              calculationStrategy,
+              customMultiplier,
+            ),
             unitId: p.unitId,
-          };
-        }),
-      );
+            costPrice: p.costPrice,
+          })),
+        );
+      }
     }
-  }, [calculationStrategy, customMultiplier, orderList.length]);
+  }, [reloadData]);
 
   // Auto-save draft PO whenever orderList or supplierNameInput changes (only when not editing an existing PO)
   useEffect(() => {
-    if (orderList.length > 0 && !editingPOId) {
+    if (editingPOId) return; // Never overwrite draft when editing an existing PO
+    if (orderList.length > 0) {
       MasterStore.saveDraftPurchaseOrder({
         orderList,
         supplierName: supplierNameInput,
@@ -549,10 +560,14 @@ function ReorderPage() {
 
     const loadedItems: OrderCartItem[] = po.items.map((i) => {
       const matchedProd = products.find((p) => p.id === i.productId);
+      const matchedUnit = units.find((u) => u.name === i.unitName);
       return {
         productId: i.productId,
+        productName: i.productName || matchedProd?.name,
+        barcode: i.barcode || matchedProd?.barcode,
         quantity: Math.max(1, i.quantity || 1),
-        unitId: i.unitId || matchedProd?.unitId || units[0]?.id || "unit-piece",
+        unitId: i.unitId || matchedProd?.unitId || matchedUnit?.id || units[0]?.id || "unit-piece",
+        unitName: i.unitName || (matchedProd ? getUnitName(matchedProd.unitId) : undefined),
         costPrice: i.costPrice !== undefined ? i.costPrice : matchedProd?.costPrice || 0,
         note: i.note,
       };
@@ -568,9 +583,13 @@ function ReorderPage() {
     setEditingPOId(null);
     setEditingPONumber("");
     setEditingPOCreatedAt("");
-    setOrderList([]);
-    MasterStore.clearDraftPurchaseOrder();
-    setHasRestoredDraft(false);
+    const draft = MasterStore.getDraftPurchaseOrder();
+    if (draft && draft.orderList && draft.orderList.length > 0) {
+      setOrderList(draft.orderList);
+      if (draft.supplierName) setSupplierNameInput(draft.supplierName);
+    } else {
+      setOrderList([]);
+    }
     toast.info("ยกเลิกการแก้ไขใบสั่งซื้อแล้ว");
   };
 
@@ -613,6 +632,7 @@ function ReorderPage() {
 
   const handleOpenEditItemModal = (item: FullOrderItem) => {
     const p = item.product;
+    setUpdateMasterCostPrice(false);
     setEditingCartItem({
       productId: p.id,
       productName: p.name,
@@ -645,6 +665,7 @@ function ReorderPage() {
             ...item,
             quantity: qty,
             unitId: editingCartItem.unitId,
+            unitName: getUnitName(editingCartItem.unitId),
             costPrice: cost,
             note: note || undefined,
           };
@@ -652,6 +673,15 @@ function ReorderPage() {
         return item;
       }),
     );
+
+    if (updateMasterCostPrice) {
+      MasterStore.updateProduct(editingCartItem.productId, {
+        costPrice: cost,
+      });
+      setProducts(MasterStore.getProducts());
+      toast.success(`อัปเดตราคาทุนสินค้าหลักเป็น ฿${cost.toFixed(2)} สำเร็จ`);
+    }
+
     toast.success(`บันทึกการแก้ไข "${editingCartItem.productName}" เรียบร้อยแล้ว`);
     setEditItemModalOpen(false);
   };
@@ -798,27 +828,43 @@ function ReorderPage() {
     priceEstimate: number;
     note?: string;
   };
-  const fullItems: FullOrderItem[] = orderList
-    .map((item): FullOrderItem | null => {
-      const product = products.find((p) => p.id === item.productId);
-      if (!product) return null;
-      const effectiveUnitId = item.unitId || product.unitId;
-      const effectiveUnitName = getUnitName(effectiveUnitId);
-      const effectiveCostPrice =
-        item.costPrice !== undefined && item.costPrice >= 0 ? item.costPrice : product.costPrice;
-      return {
-        product,
-        name: product.name,
-        quantity: item.quantity,
-        unitId: effectiveUnitId,
-        unitName: effectiveUnitName,
-        barcode: product.barcode,
-        costPrice: effectiveCostPrice,
-        priceEstimate: effectiveCostPrice * item.quantity,
-        note: item.note,
-      };
-    })
-    .filter((i): i is FullOrderItem => i !== null);
+  const fullItems: FullOrderItem[] = orderList.map((item): FullOrderItem => {
+    const product = products.find((p) => p.id === item.productId);
+    const effectiveUnitId = item.unitId || product?.unitId || units[0]?.id || "unit-piece";
+    const effectiveUnitName = item.unitName || getUnitName(effectiveUnitId);
+    const effectiveCostPrice =
+      item.costPrice !== undefined && item.costPrice >= 0
+        ? item.costPrice
+        : (product?.costPrice ?? 0);
+    const effectiveProduct: ProductItem = product || {
+      id: item.productId,
+      sku: item.productId,
+      barcode: item.barcode || "N/A",
+      codeType: "Barcode",
+      format: "CODE_128",
+      name: item.productName || "สินค้าในรายการ",
+      categoryId: categories[0]?.id || "cat-general",
+      unitId: effectiveUnitId,
+      costPrice: effectiveCostPrice,
+      sellPrice: effectiveCostPrice,
+      stock: 0,
+      minStock: 0,
+      targetStock: 0,
+      isActive: true,
+    };
+
+    return {
+      product: effectiveProduct,
+      name: effectiveProduct.name,
+      quantity: item.quantity,
+      unitId: effectiveUnitId,
+      unitName: effectiveUnitName,
+      barcode: effectiveProduct.barcode,
+      costPrice: effectiveCostPrice,
+      priceEstimate: effectiveCostPrice * item.quantity,
+      note: item.note,
+    };
+  });
 
   const totalCost = fullItems.reduce((acc, curr) => acc + (curr.priceEstimate || 0), 0);
   const totalQuantity = fullItems.reduce((acc, curr) => acc + curr.quantity, 0);
@@ -1516,18 +1562,18 @@ function ReorderPage() {
       >
         <TabsList className="grid grid-cols-2 sm:grid-cols-4 max-w-3xl h-auto p-1.5 rounded-2xl bg-muted gap-1">
           <TabsTrigger
-            value="po_history"
-            className="h-10 text-xs sm:text-sm font-semibold rounded-xl gap-1.5"
-          >
-            <ClipboardCheck className="size-4 text-primary" /> ประวัติใบสั่งซื้อ (
-            {purchaseOrders.length})
-          </TabsTrigger>
-          <TabsTrigger
             value="create_po"
             className="h-10 text-xs sm:text-sm font-semibold rounded-xl gap-1.5"
           >
             <ClipboardList className="size-4 text-emerald-600" /> จัดทำใบสั่งซื้อ (
             {fullItems.length})
+          </TabsTrigger>
+          <TabsTrigger
+            value="po_history"
+            className="h-10 text-xs sm:text-sm font-semibold rounded-xl gap-1.5"
+          >
+            <ClipboardCheck className="size-4 text-primary" /> ประวัติใบสั่งซื้อ (
+            {purchaseOrders.length})
           </TabsTrigger>
           <TabsTrigger
             value="calculator"
@@ -2043,14 +2089,25 @@ function ReorderPage() {
                           <Input
                             type="number"
                             min="1"
-                            value={item.quantity}
-                            onChange={(e) =>
-                              handleUpdateQuantity(
-                                item.product.id,
-                                Math.max(1, Number(e.target.value) || 1),
-                                true,
-                              )
-                            }
+                            value={item.quantity === 0 ? "" : item.quantity}
+                            onChange={(e) => {
+                              const raw = e.target.value;
+                              if (raw === "") {
+                                handleUpdateQuantity(item.product.id, 0, true);
+                              } else {
+                                const val = parseInt(raw, 10);
+                                handleUpdateQuantity(
+                                  item.product.id,
+                                  isNaN(val) ? 1 : Math.max(1, val),
+                                  true,
+                                );
+                              }
+                            }}
+                            onBlur={() => {
+                              if (item.quantity < 1) {
+                                handleUpdateQuantity(item.product.id, 1, true);
+                              }
+                            }}
                             className="h-8 text-center font-mono font-bold text-sm bg-background px-1"
                           />
                           <Button
@@ -2104,7 +2161,8 @@ function ReorderPage() {
                 <CardHeader className="flex flex-row items-center justify-between pb-3">
                   <div>
                     <CardTitle className="text-base flex items-center gap-2">
-                      <ClipboardList className="size-5 text-primary" /> รายการสินค้าในใบสั่งซื้อ
+                      <ClipboardList className="size-5 text-primary" /> รายการสินค้าที่ต้องสั่ง (
+                      {fullItems.length})
                     </CardTitle>
                     <CardDescription>
                       ปรับเปลี่ยนจำนวน หน่วยนับ ราคาทุนต่อหน่วย และหมายเหตุได้อิสระ
@@ -2238,14 +2296,25 @@ function ReorderPage() {
                                   <Input
                                     type="number"
                                     min="1"
-                                    value={item.quantity}
-                                    onChange={(e) =>
-                                      handleUpdateQuantity(
-                                        item.product.id,
-                                        Math.max(1, Number(e.target.value) || 1),
-                                        true,
-                                      )
-                                    }
+                                    value={item.quantity === 0 ? "" : item.quantity}
+                                    onChange={(e) => {
+                                      const raw = e.target.value;
+                                      if (raw === "") {
+                                        handleUpdateQuantity(item.product.id, 0, true);
+                                      } else {
+                                        const val = parseInt(raw, 10);
+                                        handleUpdateQuantity(
+                                          item.product.id,
+                                          isNaN(val) ? 1 : Math.max(1, val),
+                                          true,
+                                        );
+                                      }
+                                    }}
+                                    onBlur={() => {
+                                      if (item.quantity < 1) {
+                                        handleUpdateQuantity(item.product.id, 1, true);
+                                      }
+                                    }}
                                     className="h-7 w-16 text-center font-mono font-bold text-xs px-1"
                                   />
                                   <Button
@@ -2280,13 +2349,20 @@ function ReorderPage() {
                                     type="number"
                                     min="0"
                                     step="0.5"
-                                    value={item.costPrice}
-                                    onChange={(e) =>
-                                      handleUpdateCostPrice(
-                                        item.product.id,
-                                        Number(e.target.value) || 0,
-                                      )
-                                    }
+                                    placeholder="0.00"
+                                    value={item.costPrice === 0 ? "" : item.costPrice}
+                                    onChange={(e) => {
+                                      const raw = e.target.value;
+                                      if (raw === "") {
+                                        handleUpdateCostPrice(item.product.id, 0);
+                                      } else {
+                                        const val = parseFloat(raw);
+                                        handleUpdateCostPrice(
+                                          item.product.id,
+                                          isNaN(val) ? 0 : Math.max(0, val),
+                                        );
+                                      }
+                                    }}
                                     className="h-7 w-20 text-right font-mono font-semibold text-xs px-1"
                                   />
                                 </div>
@@ -2656,14 +2732,24 @@ function ReorderPage() {
                               )}
                             </TableCell>
                             <TableCell className="text-right">
-                              <Button
-                                size="sm"
-                                variant={isAdded ? "secondary" : "default"}
-                                className="h-8 text-xs rounded-lg font-semibold"
-                                onClick={() => handleApplySingleForecast(item)}
-                              >
-                                {isAdded ? "อยู่ในใบสั่งแล้ว" : `+ สั่ง ${item.suggestedQuantity}`}
-                              </Button>
+                              {isAdded ? (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-8 text-xs rounded-lg font-semibold border-emerald-500/40 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-950/20"
+                                  onClick={() => setActiveTab("create_po")}
+                                >
+                                  ✏️ ในใบสั่งแล้ว (กดเพื่อแก้ไข)
+                                </Button>
+                              ) : (
+                                <Button
+                                  size="sm"
+                                  className="h-8 text-xs rounded-lg font-semibold bg-emerald-600 hover:bg-emerald-700 text-white"
+                                  onClick={() => handleApplySingleForecast(item)}
+                                >
+                                  + สั่ง {item.suggestedQuantity}
+                                </Button>
+                              )}
                             </TableCell>
                           </TableRow>
                         );
@@ -2822,23 +2908,30 @@ function ReorderPage() {
                               )}
                             </TableCell>
                             <TableCell className="text-right">
-                              <Button
-                                size="sm"
-                                variant={isAdded ? "secondary" : "default"}
-                                className="h-8 text-xs rounded-lg font-semibold"
-                                onClick={() => {
-                                  if (!isAdded) {
+                              {isAdded ? (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-8 text-xs rounded-lg font-semibold border-emerald-500/40 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-950/20"
+                                  onClick={() => setActiveTab("create_po")}
+                                >
+                                  ✏️ ในใบสั่งแล้ว (กดเพื่อแก้ไข)
+                                </Button>
+                              ) : (
+                                <Button
+                                  size="sm"
+                                  className="h-8 text-xs rounded-lg font-semibold bg-emerald-600 hover:bg-emerald-700 text-white"
+                                  onClick={() => {
                                     setOrderList((prev) => [
                                       ...prev,
                                       { productId: p.id, quantity: needed, unitId: p.unitId },
                                     ]);
-                                  }
-                                }}
-                              >
-                                {isAdded
-                                  ? "สั่งซื้อแล้ว"
-                                  : `+ สั่ง ${needed} ${getUnitName(p.unitId)}`}
-                              </Button>
+                                    toast.success(`เพิ่ม ${p.name} เข้าใบสั่งซื้อแล้ว`);
+                                  }}
+                                >
+                                  + สั่ง {needed} {getUnitName(p.unitId)}
+                                </Button>
+                              )}
                             </TableCell>
                           </TableRow>
                         );
@@ -3525,14 +3618,18 @@ function ReorderPage() {
                       type="number"
                       min="1"
                       className="h-9 rounded-lg font-mono text-center font-bold text-sm"
-                      value={editingCartItem.quantity}
-                      onChange={(e) =>
+                      value={editingCartItem.quantity === 0 ? "" : editingCartItem.quantity}
+                      onChange={(e) => {
+                        const val = e.target.value === "" ? 0 : Number(e.target.value);
                         setEditingCartItem((prev) =>
-                          prev
-                            ? { ...prev, quantity: Math.max(1, Number(e.target.value) || 1) }
-                            : null,
-                        )
-                      }
+                          prev ? { ...prev, quantity: isNaN(val) ? 1 : val } : null,
+                        );
+                      }}
+                      onBlur={() => {
+                        setEditingCartItem((prev) =>
+                          prev ? { ...prev, quantity: Math.max(1, prev.quantity || 1) } : null,
+                        );
+                      }}
                     />
                     <Button
                       type="button"
@@ -3610,13 +3707,15 @@ function ReorderPage() {
                       type="number"
                       min="0"
                       step="0.5"
+                      placeholder="0.00"
                       className="pl-6 h-9 rounded-lg font-mono font-semibold text-xs"
-                      value={editingCartItem.costPrice}
-                      onChange={(e) =>
+                      value={editingCartItem.costPrice === 0 ? "" : editingCartItem.costPrice}
+                      onChange={(e) => {
+                        const val = e.target.value === "" ? 0 : Number(e.target.value);
                         setEditingCartItem((prev) =>
-                          prev ? { ...prev, costPrice: Number(e.target.value) || 0 } : null,
-                        )
-                      }
+                          prev ? { ...prev, costPrice: isNaN(val) ? 0 : val } : null,
+                        );
+                      }}
                     />
                   </div>
                 </div>
@@ -3634,6 +3733,23 @@ function ReorderPage() {
                     }
                   />
                 </div>
+              </div>
+
+              {/* Master Cost Update Option */}
+              <div className="flex items-center gap-2 p-2.5 rounded-xl bg-muted/40 border">
+                <input
+                  type="checkbox"
+                  id="chkUpdateMasterCost"
+                  checked={updateMasterCostPrice}
+                  onChange={(e) => setUpdateMasterCostPrice(e.target.checked)}
+                  className="size-4 rounded border-input text-primary focus:ring-primary cursor-pointer"
+                />
+                <Label
+                  htmlFor="chkUpdateMasterCost"
+                  className="text-xs cursor-pointer font-medium text-foreground select-none"
+                >
+                  อัปเดตราคาทุนนี้ไปยังข้อมูลสินค้าหลัก ({editingCartItem.productName}) ด้วย
+                </Label>
               </div>
 
               {/* Subtotal Calculation Box */}
