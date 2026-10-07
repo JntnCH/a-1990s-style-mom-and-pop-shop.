@@ -40,6 +40,7 @@ import {
   Sparkles,
   Trash2,
   TrendingUp,
+  Truck,
   User,
   Users,
   Wallet,
@@ -177,13 +178,13 @@ function ReorderPage() {
   // Selected Order Items (Cart)
   interface OrderCartItem {
     productId: string;
-    productName?: string;
-    barcode?: string;
+    productName?: string | undefined;
+    barcode?: string | undefined;
     quantity: number;
     unitId: string;
-    unitName?: string;
-    costPrice?: number;
-    note?: string;
+    unitName?: string | undefined;
+    costPrice?: number | undefined;
+    note?: string | undefined;
   }
   const [orderList, setOrderList] = useState<OrderCartItem[]>([]);
   const [supplierNameInput, setSupplierNameInput] = useState(
@@ -235,7 +236,7 @@ function ReorderPage() {
   // Server Messaging API & LINE Recipient Modal
   const [pushModalOpen, setPushModalOpen] = useState(false);
   const [recipientFilterTab, setRecipientFilterTab] = useState<
-    "ALL" | "SUPPLIERS" | "GROUPS" | "STAFF"
+    "ALL" | "SUPPLIERS" | "GROUPS" | "STAFF" | "USERS"
   >("ALL");
   const [targetIdInput, setTargetIdInput] = useState("");
   const [friendSearchQuery, setFriendSearchQuery] = useState("");
@@ -846,7 +847,7 @@ function ReorderPage() {
     unitId: string;
     costPrice: number;
     priceEstimate: number;
-    note?: string;
+    note?: string | undefined;
   };
   const fullItems: FullOrderItem[] = orderList.map((item): FullOrderItem => {
     const product = products.find((p) => p.id === item.productId);
@@ -870,7 +871,10 @@ function ReorderPage() {
       stock: 0,
       minStock: 0,
       targetStock: 0,
+      reorderQuantity: 0,
       isActive: true,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
     };
 
     return {
@@ -890,7 +894,10 @@ function ReorderPage() {
   const totalQuantity = fullItems.reduce((acc, curr) => acc + curr.quantity, 0);
 
   // Phase 6 Action: Save or Update Purchase Order Record
-  const handleSavePO = (status: "DRAFT" | "ORDERED", switchTab: boolean = true) => {
+  const handleSavePO = (
+    status: "DRAFT" | "ORDERED" | "RECEIVED" | "CANCELLED" = "ORDERED",
+    switchTab: boolean = true,
+  ) => {
     if (fullItems.length === 0) return undefined;
 
     // If currently editing an existing PO, update it!
@@ -1168,7 +1175,7 @@ function ReorderPage() {
       lastInteractionAt: new Date().toLocaleDateString("th-TH"),
       statusMessage: "เพิ่มด้วยตนเองในร้าน",
     };
-    MasterStore.registerFollower(newFollower);
+    MasterStore.saveFollower(newFollower);
     const updated = MasterStore.getFollowers();
     setFollowers(updated);
     setTargetIdInput(newContactId.trim());
@@ -4045,7 +4052,7 @@ function ReorderPage() {
                   <Button
                     type="button"
                     className="h-9 px-4 text-xs font-bold rounded-xl bg-[#06C755] hover:bg-[#05b34c] text-white shadow-xs gap-1.5 active:scale-95"
-                    onClick={handleOpenLiffTargetPicker}
+                    onClick={() => handleOpenLiffTargetPicker()}
                     disabled={isSending}
                   >
                     <Users className="size-4" />

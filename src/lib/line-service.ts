@@ -277,11 +277,11 @@ export type LineShareTarget = "group" | "personal";
 export interface ThreeTierSendOptions {
   summary: string;
   flexMessage?: unknown;
-  target?: LineShareTarget;
-  toUserIdOrGroupId?: string;
-  isBroadcast?: boolean;
-  channelAccessToken?: string;
-  disableIntentFallback?: boolean;
+  target?: LineShareTarget | undefined;
+  toUserIdOrGroupId?: string | undefined;
+  isBroadcast?: boolean | undefined;
+  channelAccessToken?: string | undefined;
+  disableIntentFallback?: boolean | undefined;
 }
 
 export interface LineShareResult {
