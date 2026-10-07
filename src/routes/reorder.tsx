@@ -301,6 +301,20 @@ function ReorderPage() {
   const [quickFormError, setQuickFormError] = useState("");
   const [hasRestoredDraft, setHasRestoredDraft] = useState(false);
 
+  // Editing Existing Purchase Order Mode
+  const [editingPOId, setEditingPOId] = useState<string | null>(null);
+  const [editingPONumber, setEditingPONumber] = useState<string>("");
+  const [editingPOCreatedAt, setEditingPOCreatedAt] = useState<string>("");
+  const [editingPOStatus, setEditingPOStatus] = useState<
+    "DRAFT" | "ORDERED" | "RECEIVED" | "CANCELLED"
+  >("DRAFT");
+
+  // Delete Item Confirmation Dialog State
+  const [itemToDelete, setItemToDelete] = useState<{
+    productId: string;
+    productName: string;
+  } | null>(null);
+
   const reloadData = useCallback(() => {
     const allProds = MasterStore.getProducts();
     const allCats = MasterStore.getCategories();
@@ -344,16 +358,16 @@ function ReorderPage() {
     }
   }, [calculationStrategy, customMultiplier, orderList.length]);
 
-  // Auto-save draft PO whenever orderList or supplierNameInput changes
+  // Auto-save draft PO whenever orderList or supplierNameInput changes (only when not editing an existing PO)
   useEffect(() => {
-    if (orderList.length > 0) {
+    if (orderList.length > 0 && !editingPOId) {
       MasterStore.saveDraftPurchaseOrder({
         orderList,
         supplierName: supplierNameInput,
         calculationStrategy,
       });
     }
-  }, [orderList, supplierNameInput, calculationStrategy]);
+  }, [orderList, supplierNameInput, calculationStrategy, editingPOId]);
 
   const handleClearDraft = () => {
     MasterStore.clearDraftPurchaseOrder();
@@ -483,15 +497,20 @@ function ReorderPage() {
 
   const handleUpdateQuantity = (productId: string, val: number, isDirect: boolean = false) => {
     setOrderList((prev) =>
-      prev
-        .map((item) => {
-          if (item.productId === productId) {
-            const next = isDirect ? val : item.quantity + val;
-            return next > 0 ? { ...item, quantity: next } : null;
+      prev.map((item) => {
+        if (item.productId === productId) {
+          let nextQty: number;
+          if (isDirect) {
+            const parsed = Math.floor(Number(val));
+            nextQty = isNaN(parsed) || parsed < 1 ? 1 : parsed;
+          } else {
+            // Rule 3: when quantity is 1 and "-" is clicked, maintain quantity at 1 (never delete item via stepper)
+            nextQty = Math.max(1, item.quantity + val);
           }
-          return item;
-        })
-        .filter((item): item is OrderCartItem => Boolean(item)),
+          return { ...item, quantity: nextQty };
+        }
+        return item;
+      }),
     );
   };
 
@@ -511,6 +530,48 @@ function ReorderPage() {
 
   const handleRemoveOrder = (productId: string) => {
     setOrderList((prev) => prev.filter((i) => i.productId !== productId));
+  };
+
+  const confirmDeleteItem = () => {
+    if (itemToDelete) {
+      handleRemoveOrder(itemToDelete.productId);
+      toast.success(`ลบสินค้า "${itemToDelete.productName}" ออกจากใบสั่งซื้อแล้ว`);
+      setItemToDelete(null);
+    }
+  };
+
+  const handleEditPO = (po: PurchaseOrderRecord) => {
+    setEditingPOId(po.id);
+    setEditingPONumber(po.orderNumber);
+    setEditingPOCreatedAt(po.createdAt);
+    setEditingPOStatus(po.status);
+    setSupplierNameInput(po.supplierName || "");
+
+    const loadedItems: OrderCartItem[] = po.items.map((i) => {
+      const matchedProd = products.find((p) => p.id === i.productId);
+      return {
+        productId: i.productId,
+        quantity: Math.max(1, i.quantity || 1),
+        unitId: i.unitId || matchedProd?.unitId || units[0]?.id || "unit-piece",
+        costPrice: i.costPrice !== undefined ? i.costPrice : matchedProd?.costPrice || 0,
+        note: i.note,
+      };
+    });
+
+    setOrderList(loadedItems);
+    setHasRestoredDraft(false);
+    setActiveTab("create_po");
+    toast.info(`กำลังแก้ไขใบสั่งซื้อ ${po.orderNumber}`);
+  };
+
+  const handleCancelEditPO = () => {
+    setEditingPOId(null);
+    setEditingPONumber("");
+    setEditingPOCreatedAt("");
+    setOrderList([]);
+    MasterStore.clearDraftPurchaseOrder();
+    setHasRestoredDraft(false);
+    toast.info("ยกเลิกการแก้ไขใบสั่งซื้อแล้ว");
   };
 
   // Filter available products for cascading selection in Add Item Modal
@@ -762,9 +823,53 @@ function ReorderPage() {
   const totalCost = fullItems.reduce((acc, curr) => acc + (curr.priceEstimate || 0), 0);
   const totalQuantity = fullItems.reduce((acc, curr) => acc + curr.quantity, 0);
 
-  // Phase 6 Action: Save Purchase Order Record
+  // Phase 6 Action: Save or Update Purchase Order Record
   const handleSavePO = (status: "DRAFT" | "ORDERED", switchTab: boolean = true) => {
     if (fullItems.length === 0) return undefined;
+
+    // If currently editing an existing PO, update it!
+    if (editingPOId) {
+      const updated = MasterStore.updatePurchaseOrder(editingPOId, {
+        supplierName: supplierNameInput.trim() || undefined,
+        items: fullItems.map((f) => ({
+          productId: f.product.id,
+          productName: f.product.name,
+          barcode: f.product.barcode,
+          quantity: f.quantity,
+          unitName: f.unitName,
+          unitId: f.unitId,
+          costPrice: f.costPrice,
+          total: f.priceEstimate,
+          note: f.note,
+        })),
+        totalQuantity,
+        totalCost,
+        status,
+        sentViaLineAt:
+          status === "ORDERED"
+            ? new Date().toLocaleDateString("th-TH") + " " + new Date().toLocaleTimeString("th-TH")
+            : undefined,
+      });
+
+      if (updated) {
+        setPurchaseOrders(MasterStore.getPurchaseOrders());
+        MasterStore.clearDraftPurchaseOrder();
+        setEditingPOId(null);
+        setEditingPONumber("");
+        setEditingPOCreatedAt("");
+        setStatusMessage({
+          type: "success",
+          text: `บันทึกการแก้ไขใบสั่งซื้อ ${updated.orderNumber} (สถานะ: ${
+            status === "ORDERED" ? "สั่งซื้อแล้ว" : "ฉบับร่าง"
+          }) เรียบร้อยแล้ว`,
+        });
+        toast.success(`บันทึกการแก้ไขใบสั่งซื้อ ${updated.orderNumber} สำเร็จ`);
+        if (switchTab) {
+          setActiveTab("po_history");
+        }
+        return updated;
+      }
+    }
 
     const poRecord = MasterStore.savePurchaseOrder({
       supplierName: supplierNameInput.trim() || undefined,
@@ -789,6 +894,7 @@ function ReorderPage() {
     });
 
     setPurchaseOrders(MasterStore.getPurchaseOrders());
+    MasterStore.clearDraftPurchaseOrder();
     setStatusMessage({
       type: "success",
       text: `สร้างใบสั่งซื้อ ${poRecord.orderNumber} (สถานะ: ${
@@ -1552,6 +1658,14 @@ function ReorderPage() {
 
                         <div className="flex items-center gap-1">
                           <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-7 text-xs px-2 gap-1 rounded-lg text-primary border-primary/30 hover:bg-primary/10"
+                            onClick={() => handleEditPO(po)}
+                          >
+                            <Pencil className="size-3" /> แก้ไข
+                          </Button>
+                          <Button
                             variant="ghost"
                             size="sm"
                             className="h-7 text-xs px-2 gap-1 rounded-lg"
@@ -1620,6 +1734,14 @@ function ReorderPage() {
                               <Button
                                 variant="outline"
                                 size="sm"
+                                className="h-8 text-xs gap-1 rounded-lg text-primary border-primary/30 hover:bg-primary/10 font-medium"
+                                onClick={() => handleEditPO(po)}
+                              >
+                                <Pencil className="size-3.5" /> แก้ไข
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
                                 className="h-8 text-xs gap-1 rounded-lg"
                                 onClick={() => handleOpenPODetail(po)}
                               >
@@ -1670,25 +1792,67 @@ function ReorderPage() {
 
         {/* TAB 2: CREATE PURCHASE ORDER & LINE FLEX (PHASE 6) */}
         <TabsContent value="create_po" className="space-y-4">
-          {/* DRAFT RECOVERY BANNER */}
-          {hasRestoredDraft && orderList.length > 0 && (
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 rounded-2xl bg-amber-500/10 border border-amber-500/25 text-xs text-amber-800 dark:text-amber-300 shadow-2xs animate-in fade-in">
-              <div className="flex items-center gap-2">
-                <ClipboardCheck className="size-4 shrink-0 text-amber-600" />
-                <span>
-                  <strong>กู้คืนแบบร่างอัตโนมัติ:</strong> กำลังแสดงรายการที่จดบันทึกค้างไว้ (
-                  {orderList.length} รายการ) ป้องกันข้อมูลสูญหาย
-                </span>
+          {/* EDITING PO BANNER */}
+          {editingPOId ? (
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-2xl bg-blue-500/10 border-2 border-blue-500/30 text-blue-900 dark:text-blue-200 shadow-xs animate-in fade-in">
+              <div className="flex items-center gap-3">
+                <div className="size-9 rounded-xl bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+                  <Pencil className="size-4" />
+                </div>
+                <div>
+                  <div className="font-bold text-sm sm:text-base flex items-center gap-2 flex-wrap">
+                    <span>กำลังแก้ไขใบสั่งซื้อ:</span>
+                    <span className="font-mono text-primary font-bold">{editingPONumber}</span>
+                    {getStatusBadge(editingPOStatus)}
+                  </div>
+                  <div className="text-xs text-muted-foreground mt-0.5">
+                    สร้างเมื่อ {editingPOCreatedAt} • เมื่อกด "บันทึกการแก้ไข"
+                    ระบบจะอัปเดตใบสั่งซื้อเดิมทันที (ไม่สร้างใบใหม่)
+                  </div>
+                </div>
               </div>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-7 text-xs text-destructive hover:bg-destructive/10 px-2.5 font-medium shrink-0 rounded-lg self-end sm:self-auto"
-                onClick={handleClearDraft}
-              >
-                <Trash2 className="size-3 mr-1" /> ล้างแบบร่าง / เริ่มใบใหม่
-              </Button>
+              <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-8 text-xs rounded-xl"
+                  onClick={handleCancelEditPO}
+                >
+                  <X className="size-3.5 mr-1" /> ยกเลิกการแก้ไข
+                </Button>
+                <Button
+                  size="sm"
+                  className="h-8 text-xs font-semibold rounded-xl bg-primary text-primary-foreground shadow-xs gap-1"
+                  onClick={() =>
+                    handleSavePO(editingPOStatus === "RECEIVED" ? "RECEIVED" : editingPOStatus)
+                  }
+                >
+                  <Save className="size-3.5" /> บันทึกการแก้ไข
+                </Button>
+              </div>
             </div>
+          ) : (
+            /* DRAFT RECOVERY BANNER */
+            hasRestoredDraft &&
+            orderList.length > 0 && (
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 rounded-2xl bg-amber-500/10 border border-amber-500/25 text-xs text-amber-800 dark:text-amber-300 shadow-2xs animate-in fade-in">
+                <div className="flex items-center gap-2">
+                  <ClipboardCheck className="size-4 shrink-0 text-amber-600" />
+                  <span>
+                    <strong>กู้คืนแบบร่างอัตโนมัติ:</strong> กำลังแสดงรายการที่จดบันทึกค้างไว้ (
+                    {orderList.length} รายการ) ป้องกันข้อมูลสูญหาย
+                  </span>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 text-xs text-destructive hover:bg-destructive/10 px-2.5 font-medium shrink-0 rounded-lg self-end sm:self-auto"
+                  onClick={handleClearDraft}
+                >
+                  <Trash2 className="size-3 mr-1" /> ล้างแบบร่าง / เริ่มใบใหม่
+                </Button>
+              </div>
+            )
           )}
 
           <div className="grid gap-4 sm:gap-6 lg:grid-cols-12">
@@ -1823,7 +1987,12 @@ function ReorderPage() {
                             variant="ghost"
                             size="icon"
                             className="size-8 rounded-lg text-muted-foreground hover:text-destructive shrink-0 active:scale-90"
-                            onClick={() => handleRemoveOrder(item.product.id)}
+                            onClick={() =>
+                              setItemToDelete({
+                                productId: item.product.id,
+                                productName: item.product.name,
+                              })
+                            }
                             aria-label="ลบรายการสั่ง"
                           >
                             <Trash2 className="size-4" />
@@ -2143,7 +2312,12 @@ function ReorderPage() {
                                     variant="ghost"
                                     size="icon"
                                     className="size-7 text-muted-foreground hover:text-destructive rounded-lg"
-                                    onClick={() => handleRemoveOrder(item.product.id)}
+                                    onClick={() =>
+                                      setItemToDelete({
+                                        productId: item.product.id,
+                                        productName: item.product.name,
+                                      })
+                                    }
                                     title="ลบรายการ"
                                   >
                                     <Trash2 className="size-3.5" />
@@ -2262,25 +2436,60 @@ function ReorderPage() {
                       </Button>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-2">
-                      <Button
-                        variant="secondary"
-                        disabled={fullItems.length === 0}
-                        className="h-10 text-xs font-semibold rounded-xl gap-1.5"
-                        onClick={() => handleSavePO("DRAFT")}
-                      >
-                        <Save className="size-4" /> บันทึกฉบับร่าง (Draft)
-                      </Button>
+                    {/* Save / Update Action Controls */}
+                    {editingPOId ? (
+                      <div className="space-y-2 p-2 rounded-xl bg-blue-50/60 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800/60">
+                        <Button
+                          size="lg"
+                          disabled={fullItems.length === 0}
+                          className="h-11 w-full gap-2 bg-primary hover:bg-primary/90 text-primary-foreground font-bold text-xs rounded-xl shadow-xs active:scale-95"
+                          onClick={() =>
+                            handleSavePO(
+                              editingPOStatus === "RECEIVED" ? "RECEIVED" : editingPOStatus,
+                            )
+                          }
+                        >
+                          <Save className="size-4" /> บันทึกการแก้ไข ({editingPONumber})
+                        </Button>
+                        <div className="grid grid-cols-2 gap-2">
+                          <Button
+                            variant="secondary"
+                            disabled={fullItems.length === 0}
+                            className="h-9 text-xs font-semibold rounded-xl gap-1.5"
+                            onClick={() => handleSavePO("DRAFT")}
+                          >
+                            <Save className="size-3.5" /> บันทึกเป็นฉบับร่าง
+                          </Button>
+                          <Button
+                            variant="outline"
+                            className="h-9 text-xs font-semibold rounded-xl gap-1.5 text-destructive hover:bg-destructive/10 border-destructive/30"
+                            onClick={handleCancelEditPO}
+                          >
+                            <X className="size-3.5" /> ยกเลิกการแก้ไข
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-2 gap-2">
+                        <Button
+                          variant="secondary"
+                          disabled={fullItems.length === 0}
+                          className="h-10 text-xs font-semibold rounded-xl gap-1.5"
+                          onClick={() => handleSavePO("DRAFT")}
+                        >
+                          <Save className="size-4" /> บันทึกฉบับร่าง (Draft)
+                        </Button>
 
-                      <Button
-                        variant="default"
-                        disabled={fullItems.length === 0}
-                        className="h-10 text-xs font-semibold rounded-xl gap-1.5"
-                        onClick={() => handleSavePO("ORDERED")}
-                      >
-                        <FileCheck2 className="size-4" /> บันทึกสั่งซื้อ (Ordered)
-                      </Button>
-                    </div>
+                        <Button
+                          variant="default"
+                          disabled={fullItems.length === 0}
+                          className="h-10 text-xs font-semibold rounded-xl gap-1.5"
+                          onClick={() => handleSavePO("ORDERED")}
+                        >
+                          <FileCheck2 className="size-4" /> บันทึกสั่งซื้อ (Ordered)
+                        </Button>
+                      </div>
+                    )}
 
                     <Button
                       variant="outline"
@@ -2767,6 +2976,18 @@ function ReorderPage() {
           )}
 
           <DialogFooter className="gap-2 pt-2 border-t">
+            <Button
+              variant="outline"
+              className="h-11 rounded-xl text-xs gap-1.5 border-primary/40 text-primary font-semibold hover:bg-primary/10"
+              onClick={() => {
+                if (selectedPO) {
+                  handleEditPO(selectedPO);
+                  setDetailModalOpen(false);
+                }
+              }}
+            >
+              <Pencil className="size-4" /> แก้ไขใบสั่งซื้อนี้
+            </Button>
             <Button
               variant="outline"
               className="h-11 rounded-xl text-xs gap-1.5 border-emerald-500/40 text-emerald-700 dark:text-emerald-300 font-semibold"
@@ -4358,6 +4579,40 @@ function ReorderPage() {
               onClick={handleSaveQuickAddProduct}
             >
               <PackagePlus className="size-4" /> บันทึก &amp; บรรจุลงใบสั่งซื้อทันที
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* CONFIRM DELETE ITEM DIALOG */}
+      <Dialog open={Boolean(itemToDelete)} onOpenChange={(open) => !open && setItemToDelete(null)}>
+        <DialogContent className="w-[92vw] max-w-md rounded-2xl p-5">
+          <DialogHeader>
+            <DialogTitle className="text-base flex items-center gap-2 text-destructive">
+              <Trash2 className="size-5" /> ยืนยันการลบสินค้า
+            </DialogTitle>
+            <DialogDescription className="text-sm pt-2 text-foreground font-normal">
+              ต้องการลบสินค้า{" "}
+              <span className="font-bold text-foreground">"{itemToDelete?.productName}"</span>{" "}
+              ออกจากใบสั่งซื้อหรือไม่?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 pt-3 border-t flex flex-row justify-end">
+            <Button
+              type="button"
+              variant="outline"
+              className="h-10 text-xs rounded-xl flex-1 sm:flex-initial"
+              onClick={() => setItemToDelete(null)}
+            >
+              ยกเลิก
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              className="h-10 text-xs rounded-xl font-semibold gap-1.5 flex-1 sm:flex-initial"
+              onClick={confirmDeleteItem}
+            >
+              <Trash2 className="size-4" /> ยืนยันลบสินค้า
             </Button>
           </DialogFooter>
         </DialogContent>

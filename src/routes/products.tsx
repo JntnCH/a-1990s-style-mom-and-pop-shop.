@@ -643,22 +643,42 @@ function ProductsPage() {
         </div>
 
         {filteredProducts.length === 0 ? (
-          <Card className="rounded-2xl p-8 text-center text-muted-foreground">
-            <Package className="size-10 mx-auto mb-2 opacity-40" />
-            <p className="text-sm font-medium">ไม่พบสินค้าตามเงื่อนไขที่ค้นหา</p>
-            <Button
-              variant="outline"
-              size="sm"
-              className="mt-3 rounded-xl text-xs"
-              onClick={() => {
-                setSearchQuery("");
-                setSelectedCategory("all");
-                setSelectedZone("all");
-                setStatusFilter("ALL");
-              }}
-            >
-              ล้างตัวกรองทั้งหมด
-            </Button>
+          <Card className="rounded-2xl p-8 text-center text-muted-foreground space-y-3">
+            <Package className="size-10 mx-auto mb-1 opacity-40" />
+            <p className="text-sm font-semibold text-foreground">
+              {products.length === 0
+                ? "ยังไม่มีสินค้าในระบบ (พร้อมเริ่มบันทึกข้อมูลสินค้าจริง)"
+                : "ไม่พบสินค้าตามเงื่อนไขที่ค้นหา"}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              {products.length === 0
+                ? "เริ่มต้นด้วยการสแกนบาร์โค้ดหรือกรอกข้อมูลสินค้าจริงของร้าน"
+                : "ลองปรับคำค้นหา หรือล้างตัวกรอง"}
+            </p>
+            <div className="flex items-center justify-center gap-2 pt-1">
+              <Button
+                onClick={handleOpenCreate}
+                size="sm"
+                className="rounded-xl text-xs font-semibold gap-1.5 bg-primary text-primary-foreground shadow-xs"
+              >
+                <Plus className="size-4" /> เพิ่มสินค้าใหม่
+              </Button>
+              {products.length > 0 && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="rounded-xl text-xs"
+                  onClick={() => {
+                    setSearchQuery("");
+                    setSelectedCategory("all");
+                    setSelectedZone("all");
+                    setStatusFilter("ALL");
+                  }}
+                >
+                  ล้างตัวกรอง
+                </Button>
+              )}
+            </div>
           </Card>
         ) : (
           filteredProducts.map((p) => {
@@ -842,8 +862,29 @@ function ProductsPage() {
               <TableBody>
                 {filteredProducts.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={10} className="text-center py-10 text-muted-foreground">
-                      ไม่พบข้อมูลสินค้าตามเงื่อนไข
+                    <TableCell colSpan={10} className="text-center py-12 text-muted-foreground">
+                      <div className="max-w-sm mx-auto space-y-2.5">
+                        <Package className="size-10 mx-auto opacity-40" />
+                        <p className="font-semibold text-sm text-foreground">
+                          {products.length === 0
+                            ? "ยังไม่มีสินค้าในระบบ (พร้อมเริ่มบันทึกข้อมูลสินค้าจริง)"
+                            : "ไม่พบข้อมูลสินค้าตามเงื่อนไข"}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {products.length === 0
+                            ? "กดปุ่มด้านล่างเพื่อเริ่มบันทึกสินค้าจริง ยิงบาร์โค้ด หรืออัปโหลดรูปภาพ"
+                            : "ลองเปลี่ยนคำค้นหา หรือล้างตัวกรอง"}
+                        </p>
+                        <div className="pt-2">
+                          <Button
+                            onClick={handleOpenCreate}
+                            size="sm"
+                            className="rounded-xl text-xs font-semibold gap-1.5 bg-primary text-primary-foreground shadow-xs"
+                          >
+                            <Plus className="size-4" /> เพิ่มสินค้าใหม่
+                          </Button>
+                        </div>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ) : (

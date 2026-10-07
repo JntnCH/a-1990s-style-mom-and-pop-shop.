@@ -55,7 +55,9 @@ export function BackupRestoreTab() {
 
   // Danger Zone Confirmation Modal
   const [dangerModalOpen, setDangerModalOpen] = useState(false);
-  const [dangerAction, setDangerAction] = useState<"CLEAR_TX" | "FACTORY_RESET">("CLEAR_TX");
+  const [dangerAction, setDangerAction] = useState<"CLEAR_TX" | "CLEAR_MOCK" | "FACTORY_RESET">(
+    "CLEAR_MOCK",
+  );
   const [confirmPin, setConfirmPin] = useState("");
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -132,7 +134,7 @@ export function BackupRestoreTab() {
     }
   };
 
-  const handleOpenDangerAction = (action: "CLEAR_TX" | "FACTORY_RESET") => {
+  const handleOpenDangerAction = (action: "CLEAR_TX" | "CLEAR_MOCK" | "FACTORY_RESET") => {
     setDangerAction(action);
     setConfirmPin("");
     setDangerModalOpen(true);
@@ -148,6 +150,9 @@ export function BackupRestoreTab() {
     if (dangerAction === "CLEAR_TX") {
       BackupService.clearTransactionsOnly();
       toast.success("ล้างประวัติธุรกรรมและคิวงานพิมพ์เรียบร้อยแล้ว (ข้อมูลสินค้าคงเดิม)");
+    } else if (dangerAction === "CLEAR_MOCK") {
+      BackupService.clearAllMockData();
+      toast.success("ล้างข้อมูลทดลองทั้งหมดเรียบร้อยแล้ว พร้อมเริ่มใช้งานข้อมูลจริง 100%");
     } else if (dangerAction === "FACTORY_RESET") {
       BackupService.factoryResetAndSeed();
       toast.success("คืนค่าเริ่มต้นจากโรงงานและโหลดชุดข้อมูลตัวอย่างเรียบร้อย");
@@ -360,22 +365,46 @@ export function BackupRestoreTab() {
           </Button>
         </CardContent>
 
+        {/* Clear Mock Data for Real Store Production */}
+        <div className="border-t border-destructive/20 p-4 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-destructive/10">
+          <div className="text-xs space-y-1">
+            <div className="font-semibold text-destructive flex items-center gap-1.5">
+              <span>ล้างข้อมูลทดลองทั้งหมด (เริ่มใช้งานข้อมูลจริง 100%)</span>
+              <Badge variant="destructive" className="text-[10px]">
+                แนะนำสำหรับใช้งานจริง
+              </Badge>
+            </div>
+            <div className="text-muted-foreground text-[11px]">
+              ล้างสินค้าตัวอย่าง, สต็อกทดลอง, PO และประวัติทั้งหมด
+              เพื่อเริ่มต้นบันทึกสินค้าและข้อมูลจริงของร้าน (หมวดหมู่และหน่วยนับยังคงอยู่)
+            </div>
+          </div>
+          <Button
+            variant="destructive"
+            size="sm"
+            className="h-9 rounded-xl text-xs shrink-0 gap-1.5 font-semibold shadow-xs"
+            onClick={() => handleOpenDangerAction("CLEAR_MOCK")}
+          >
+            <Trash2 className="size-3.5" /> ล้างข้อมูลทดลองทั้งหมด
+          </Button>
+        </div>
+
         <div className="border-t border-destructive/20 p-4 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
           <div className="text-xs space-y-1">
-            <div className="font-semibold text-destructive">
-              คืนค่าเริ่มต้นจากโรงงาน (Factory Reset & Seed Data)
+            <div className="font-semibold text-muted-foreground">
+              คืนค่าเริ่มต้นจากโรงงาน (Factory Reset & Seed Demo Data)
             </div>
             <div className="text-muted-foreground text-[11px]">
               ล้างข้อมูลทั้งหมด และคืนค่ากลับสู่ชุดสินค้าตัวอย่างเริ่มต้นของร้าน MiniMark
             </div>
           </div>
           <Button
-            variant="destructive"
+            variant="outline"
             size="sm"
-            className="h-9 rounded-xl text-xs shrink-0 gap-1.5 font-semibold"
+            className="h-9 rounded-xl text-xs shrink-0 gap-1.5 font-medium border-border"
             onClick={() => handleOpenDangerAction("FACTORY_RESET")}
           >
-            <Trash2 className="size-3.5" /> คืนค่าเริ่มต้นจากโรงงาน
+            <RotateCcw className="size-3.5" /> โหลดข้อมูลตัวอย่างใหม่
           </Button>
         </div>
       </Card>
@@ -502,12 +531,16 @@ export function BackupRestoreTab() {
               <AlertTriangle className="size-5" />
               {dangerAction === "CLEAR_TX"
                 ? "ยืนยันล้างประวัติธุรกรรม"
-                : "ยืนยันคืนค่าเริ่มต้นโรงงาน"}
+                : dangerAction === "CLEAR_MOCK"
+                  ? "ยืนยันล้างข้อมูลทดลองทั้งหมด"
+                  : "ยืนยันคืนค่าเริ่มต้นโรงงาน"}
             </DialogTitle>
             <DialogDescription className="text-xs">
               {dangerAction === "CLEAR_TX"
                 ? "ประวัติการรับเข้า-เบิกออก, PO และคิวพิมพ์จะถูกล้างทั้งหมด (สินค้าคงเดิม)"
-                : "ข้อมูลทั้งหมดจะถูกลบและแทนที่ด้วยชุดข้อมูลเริ่มต้นของ MiniMark"}
+                : dangerAction === "CLEAR_MOCK"
+                  ? "สินค้าตัวอย่าง, สต็อกทดลอง, PO และประวัติทั้งหมดจะถูกล้างออก เพื่อให้คุณเริ่มต้นบันทึกข้อมูลสินค้าจริงของร้าน"
+                  : "ข้อมูลทั้งหมดจะถูกลบและแทนที่ด้วยชุดข้อมูลเริ่มต้นของ MiniMark"}
             </DialogDescription>
           </DialogHeader>
 

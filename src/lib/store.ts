@@ -955,6 +955,28 @@ export const MasterStore = {
     safeSet(STORAGE_KEYS.PURCHASE_ORDERS, [newOrder, ...list]);
     return newOrder;
   },
+  updatePurchaseOrder(
+    id: string,
+    updates: Partial<Omit<PurchaseOrderRecord, "id" | "orderNumber" | "createdAt">> & {
+      orderNumber?: string;
+      createdAt?: string;
+    },
+  ): PurchaseOrderRecord | undefined {
+    const list = this.getPurchaseOrders();
+    const target = list.find((p) => p.id === id);
+    if (!target) return undefined;
+
+    const updated: PurchaseOrderRecord = {
+      ...target,
+      ...updates,
+      id: target.id, // Guarantee ID is preserved
+      orderNumber: updates.orderNumber || target.orderNumber, // Guarantee orderNumber is preserved
+      createdAt: updates.createdAt || target.createdAt, // Guarantee createdAt is preserved
+    };
+    const nextList = list.map((p) => (p.id === id ? updated : p));
+    safeSet(STORAGE_KEYS.PURCHASE_ORDERS, nextList);
+    return updated;
+  },
   updatePurchaseOrderStatus(
     id: string,
     status: "DRAFT" | "ORDERED" | "RECEIVED" | "CANCELLED",
@@ -1008,5 +1030,22 @@ export const MasterStore = {
     this.updatePurchaseOrderStatus(poId, "RECEIVED");
 
     return { success: true, movements: createdMovements };
+  },
+
+  /**
+   * Clear all mock / sample data to start with 100% clean real store database
+   */
+  clearAllMockData(): void {
+    if (typeof window === "undefined") return;
+    safeSet(STORAGE_KEYS.PRODUCTS, []);
+    safeSet(STORAGE_KEYS.MOVEMENTS, []);
+    safeSet(STORAGE_KEYS.PURCHASE_ORDERS, []);
+    safeSet(STORAGE_KEYS.RECEIVES, []);
+    try {
+      localStorage.removeItem(STORAGE_KEYS.PO_DRAFT);
+      localStorage.setItem("minimark_print_jobs_v1", JSON.stringify([]));
+    } catch {
+      // ignore
+    }
   },
 };

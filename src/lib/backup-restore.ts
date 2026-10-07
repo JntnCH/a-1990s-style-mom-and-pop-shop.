@@ -418,6 +418,27 @@ export const BackupService = {
   },
 
   /**
+   * Danger Zone: Clear all mock/sample data (products, movements, purchase orders, receives, print jobs)
+   * Keeps structure (categories, units, zones) and staff authentication intact for real production store operations.
+   */
+  clearAllMockData(): void {
+    if (typeof window === "undefined") return;
+    localStorage.setItem(STORAGE_KEYS.PRODUCTS, JSON.stringify([]));
+    localStorage.setItem(STORAGE_KEYS.MOVEMENTS, JSON.stringify([]));
+    localStorage.setItem(STORAGE_KEYS.PURCHASE_ORDERS, JSON.stringify([]));
+    localStorage.setItem(STORAGE_KEYS.RECEIVES, JSON.stringify([]));
+    try {
+      localStorage.removeItem(STORAGE_KEYS.PO_DRAFT);
+      localStorage.setItem("minimark_print_jobs_v1", JSON.stringify([]));
+    } catch {
+      // ignore
+    }
+
+    window.dispatchEvent(new Event("minimark_store_change"));
+    window.dispatchEvent(new Event("minimark_print_jobs_change"));
+  },
+
+  /**
    * Danger Zone: Factory Reset all collections back to initial default seed data
    */
   factoryResetAndSeed(): void {
