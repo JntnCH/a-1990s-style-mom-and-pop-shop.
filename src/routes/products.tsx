@@ -349,8 +349,13 @@ function ProductsPage() {
   const handleSaveProduct = () => {
     setFormError(null);
 
-    const isSkuValid = validateSkuLive(formSku, editingProduct?.id);
-    const isBarcodeValid = validateBarcodeLive(formBarcode, editingProduct?.id);
+    const effectiveSku =
+      formSku.trim() || editingProduct?.sku || `SKU-${Date.now().toString().slice(-6)}`;
+    const effectiveBarcode =
+      formBarcode.trim() || editingProduct?.barcode || generateStoreBarcode("EAN_13").barcode;
+
+    const isSkuValid = validateSkuLive(effectiveSku, editingProduct?.id);
+    const isBarcodeValid = validateBarcodeLive(effectiveBarcode, editingProduct?.id);
 
     if (!formName.trim()) {
       setFormError("กรุณากรอกชื่อสินค้า");
@@ -364,8 +369,8 @@ function ProductsPage() {
 
     if (editingProduct) {
       MasterStore.updateProduct(editingProduct.id, {
-        sku: formSku.trim(),
-        barcode: formBarcode.trim(),
+        sku: effectiveSku,
+        barcode: effectiveBarcode,
         codeType: formCodeType,
         format: formFormat,
         name: formName.trim(),
@@ -384,8 +389,8 @@ function ProductsPage() {
       toast.success("อัปเดตข้อมูลสินค้าสำเร็จ");
     } else {
       MasterStore.addProduct({
-        sku: formSku.trim(),
-        barcode: formBarcode.trim(),
+        sku: effectiveSku,
+        barcode: effectiveBarcode,
         codeType: formCodeType,
         format: formFormat,
         name: formName.trim(),
@@ -1390,9 +1395,7 @@ function ProductsPage() {
             <Button
               className="h-11 sm:h-10 rounded-xl w-full sm:w-auto font-bold bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm"
               onClick={handleSaveProduct}
-              disabled={
-                !formName.trim() || !formSku.trim() || Boolean(skuError) || Boolean(barcodeError)
-              }
+              disabled={!formName.trim() || Boolean(skuError) || Boolean(barcodeError)}
             >
               บันทึกข้อมูลสินค้า
             </Button>

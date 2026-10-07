@@ -213,11 +213,14 @@ function ReorderPage() {
     unitId: string;
     costPrice: number;
     masterCostPrice: number;
+    sellPrice?: number;
     note: string;
     stock: number;
     minStock: number;
     targetStock: number;
+    categoryId: string;
     categoryName: string;
+    zoneId?: string;
     zoneName: string;
   } | null>(null);
 
@@ -392,7 +395,7 @@ function ReorderPage() {
       setQuickFormError("กรุณาระบุชื่อสินค้า");
       return;
     }
-    const finalBarcode = quickBarcode.trim() || generateStoreBarcode("EAN_13");
+    const finalBarcode = quickBarcode.trim() || generateStoreBarcode("EAN_13").barcode;
     const finalSku = quickSku.trim() || `SKU-${Date.now().toString().slice(-6)}`;
     const finalCat = quickCatId || categories[0]?.id || "cat-general";
     const finalUnit = quickUnitId || units[0]?.id || "unit-piece";
@@ -425,8 +428,11 @@ function ReorderPage() {
     setOrderList((prev) => [
       {
         productId: newProd.id,
+        productName: newProd.name,
+        barcode: newProd.barcode,
         quantity: qty,
         unitId: newProd.unitId,
+        unitName: MasterStore.getUnitName(newProd.unitId),
         costPrice: newProd.costPrice,
       },
       ...prev,
@@ -446,7 +452,7 @@ function ReorderPage() {
     setQuickFormError("");
 
     toast.success(
-      `เพิ่มสินค้าใหม่ "${newProd.name}" และใส่ลงในใบสั่งซื้อ (${qty} ${MasterStore.getUnitName(newProd.unitId)}) เรียบร้อยแล้ว`,
+      `บันทึกสินค้าใหม่ "${newProd.name}" และบรรจุลงในใบสั่งซื้อ (${qty} ${MasterStore.getUnitName(newProd.unitId)}) สำเร็จ`,
     );
   };
 
@@ -632,21 +638,24 @@ function ReorderPage() {
 
   const handleOpenEditItemModal = (item: FullOrderItem) => {
     const p = item.product;
-    setUpdateMasterCostPrice(false);
+    setUpdateMasterCostPrice(true);
     setEditingCartItem({
       productId: p.id,
       productName: p.name,
       barcode: p.barcode,
-      sku: p.sku,
+      sku: p.sku || "",
       quantity: item.quantity,
       unitId: item.unitId,
       costPrice: item.costPrice,
       masterCostPrice: p.costPrice,
+      sellPrice: p.sellPrice || 0,
       note: item.note || "",
       stock: p.stock,
       minStock: p.minStock,
       targetStock: p.targetStock || p.reorderQuantity || 0,
+      categoryId: p.categoryId,
       categoryName: getCatName(p.categoryId),
+      zoneId: p.zoneId || "",
       zoneName: zones.find((z) => z.id === p.zoneId)?.name || "โซนทั่วไป",
     });
     setEditItemModalOpen(true);
@@ -656,13 +665,18 @@ function ReorderPage() {
     if (!editingCartItem) return;
     const qty = Math.max(1, Number(editingCartItem.quantity) || 1);
     const cost = Math.max(0, Number(editingCartItem.costPrice) || 0);
+    const name = editingCartItem.productName.trim() || "สินค้า";
+    const barcode = editingCartItem.barcode.trim() || generateStoreBarcode("EAN_13").barcode;
     const note = editingCartItem.note.trim();
 
+    // 1. Update in current order list
     setOrderList((prev) =>
       prev.map((item) => {
         if (item.productId === editingCartItem.productId) {
           return {
             ...item,
+            productName: name,
+            barcode: barcode,
             quantity: qty,
             unitId: editingCartItem.unitId,
             unitName: getUnitName(editingCartItem.unitId),
@@ -674,15 +688,21 @@ function ReorderPage() {
       }),
     );
 
-    if (updateMasterCostPrice) {
-      MasterStore.updateProduct(editingCartItem.productId, {
-        costPrice: cost,
-      });
-      setProducts(MasterStore.getProducts());
-      toast.success(`อัปเดตราคาทุนสินค้าหลักเป็น ฿${cost.toFixed(2)} สำเร็จ`);
-    }
+    // 2. Always update the product in MasterStore as well
+    MasterStore.updateProduct(editingCartItem.productId, {
+      name,
+      barcode,
+      sku: editingCartItem.sku?.trim() || undefined,
+      costPrice: cost,
+      sellPrice: Number(editingCartItem.sellPrice) || 0,
+      minStock: Math.max(0, Number(editingCartItem.minStock) || 0),
+      unitId: editingCartItem.unitId,
+      categoryId: editingCartItem.categoryId,
+      zoneId: editingCartItem.zoneId || undefined,
+    });
+    setProducts(MasterStore.getProducts());
 
-    toast.success(`บันทึกการแก้ไข "${editingCartItem.productName}" เรียบร้อยแล้ว`);
+    toast.success(`บันทึกข้อมูลสินค้า "${name}" และอัปเดตใบสั่งซื้อเรียบร้อยแล้ว`);
     setEditItemModalOpen(false);
   };
 
@@ -900,6 +920,8 @@ function ReorderPage() {
       if (updated) {
         setPurchaseOrders(MasterStore.getPurchaseOrders());
         MasterStore.clearDraftPurchaseOrder();
+        setOrderList([]);
+        setSupplierNameInput("");
         setEditingPOId(null);
         setEditingPONumber("");
         setEditingPOCreatedAt("");
@@ -941,12 +963,15 @@ function ReorderPage() {
 
     setPurchaseOrders(MasterStore.getPurchaseOrders());
     MasterStore.clearDraftPurchaseOrder();
+    setOrderList([]);
+    setSupplierNameInput("");
     setStatusMessage({
       type: "success",
       text: `สร้างใบสั่งซื้อ ${poRecord.orderNumber} (สถานะ: ${
         status === "ORDERED" ? "สั่งซื้อแล้ว" : "ฉบับร่าง"
       }) เรียบร้อยแล้ว`,
     });
+    toast.success(`บันทึกใบสั่งซื้อ ${poRecord.orderNumber} สำเร็จ`);
     if (switchTab) {
       setActiveTab("po_history");
     }
@@ -1861,19 +1886,10 @@ function ReorderPage() {
                 <Button
                   variant="outline"
                   size="sm"
-                  className="h-8 text-xs rounded-xl"
+                  className="h-8 text-xs rounded-xl hover:bg-destructive/10 hover:text-destructive"
                   onClick={handleCancelEditPO}
                 >
                   <X className="size-3.5 mr-1" /> ยกเลิกการแก้ไข
-                </Button>
-                <Button
-                  size="sm"
-                  className="h-8 text-xs font-semibold rounded-xl bg-primary text-primary-foreground shadow-xs gap-1"
-                  onClick={() =>
-                    handleSavePO(editingPOStatus === "RECEIVED" ? "RECEIVED" : editingPOStatus)
-                  }
-                >
-                  <Save className="size-3.5" /> บันทึกการแก้ไข
                 </Button>
               </div>
             </div>
@@ -1905,42 +1921,22 @@ function ReorderPage() {
             {/* REORDER ITEMS LIST */}
             <div className="lg:col-span-7 space-y-3">
               <Card className="rounded-2xl p-4 border-border/80 shadow-xs">
-                <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
-                  <div className="space-y-1.5 flex-1">
-                    <Label className="text-xs font-semibold">
-                      ชื่อซัพพลายเออร์ / ร้านค้าผู้จัดจำหน่าย
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-xs font-semibold flex items-center gap-1.5">
+                      <Truck className="size-3.5 text-primary" /> ชื่อซัพพลายเออร์ /
+                      ร้านค้าผู้จัดจำหน่าย
                     </Label>
-                    <Input
-                      placeholder="เช่น บริษัท ยูนิลีเวอร์, แม็คโคร, ร้านขายส่ง ก."
-                      className="h-10 rounded-xl text-sm"
-                      value={supplierNameInput}
-                      onChange={(e) => setSupplierNameInput(e.target.value)}
-                    />
+                    <span className="text-[11px] text-muted-foreground">
+                      ระบุเพื่อพิมพ์บนใบสั่งซื้อและส่งผ่านไลน์
+                    </span>
                   </div>
-                  <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
-                    <Button
-                      onClick={handleOpenAddModal}
-                      variant="outline"
-                      className="h-10 rounded-xl font-semibold gap-1.5 shrink-0 shadow-2xs active:scale-95 text-xs"
-                    >
-                      <Plus className="size-4" /> เลือกสินค้าเดิม
-                    </Button>
-                    <Button
-                      onClick={() => {
-                        setQuickName("");
-                        setQuickBarcode("");
-                        setQuickSku("");
-                        setQuickCostPrice(0);
-                        setQuickSellPrice(0);
-                        setQuickOrderQty(10);
-                        setQuickFormError("");
-                        setQuickAddModalOpen(true);
-                      }}
-                      className="h-10 rounded-xl font-semibold gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white shrink-0 shadow-xs active:scale-95 text-xs"
-                    >
-                      <PackagePlus className="size-4" /> + เพิ่มสินค้าใหม่ด่วน
-                    </Button>
-                  </div>
+                  <Input
+                    placeholder="เช่น บริษัท ยูนิลีเวอร์, แม็คโคร, ร้านขายส่ง ก."
+                    className="h-10 rounded-xl text-sm"
+                    value={supplierNameInput}
+                    onChange={(e) => setSupplierNameInput(e.target.value)}
+                  />
                 </div>
               </Card>
 
@@ -3527,131 +3523,122 @@ function ReorderPage() {
         </DialogContent>
       </Dialog>
 
-      {/* EDIT ITEM DIALOG (DETAILED CUSTOMIZATION OF ORDER ITEM) */}
+      {/* EDIT ITEM DIALOG (DETAILED CUSTOMIZATION OF PRODUCT & ORDER ITEM) */}
       <Dialog open={editItemModalOpen} onOpenChange={setEditItemModalOpen}>
-        <DialogContent className="w-[96vw] max-w-lg rounded-2xl p-4 sm:p-6 max-h-[90vh] overflow-y-auto">
+        <DialogContent className="w-[96vw] max-w-xl rounded-2xl p-4 sm:p-6 max-h-[92vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-base sm:text-lg flex items-center gap-2">
               <Pencil className="size-5 text-primary" />
-              แก้ไขรายการสินค้าในใบสั่งซื้อ
+              แก้ไขข้อมูลสินค้าและรายการสั่งซื้อ
             </DialogTitle>
             <DialogDescription className="text-xs">
-              ปรับเปลี่ยนจำนวน หน่วยนับ ราคาทุนต่อหน่วย และหมายเหตุของสินค้านี้
+              แก้ไขข้อมูลสินค้าหลัก (ชื่อ, บาร์โค้ด, ราคา, หมวดหมู่, สต็อกขั้นต่ำ)
+              และปรับจำนวนที่ต้องการสั่งซื้อ
             </DialogDescription>
           </DialogHeader>
 
           {editingCartItem && (
-            <div className="space-y-4 py-2">
-              {/* Product Info Card */}
-              <div className="p-3.5 rounded-xl bg-muted/40 border space-y-2.5">
-                <div className="flex items-start justify-between gap-2">
-                  <div>
-                    <h4 className="text-sm font-bold text-foreground">
-                      {editingCartItem.productName}
-                    </h4>
-                    <div className="flex items-center gap-2 text-xs text-muted-foreground font-mono mt-0.5">
-                      <span>{editingCartItem.barcode}</span>
-                      {editingCartItem.sku && (
-                        <>
-                          <span>•</span>
-                          <span>SKU: {editingCartItem.sku}</span>
-                        </>
-                      )}
-                    </div>
+            <div className="space-y-3.5 py-1 text-xs">
+              {/* Product Name */}
+              <div className="space-y-1">
+                <Label className="text-xs font-semibold">ชื่อสินค้า *</Label>
+                <Input
+                  className="h-10 rounded-xl font-medium text-sm"
+                  value={editingCartItem.productName}
+                  onChange={(e) =>
+                    setEditingCartItem((prev) =>
+                      prev ? { ...prev, productName: e.target.value } : null,
+                    )
+                  }
+                  placeholder="เช่น นมถั่วเหลือง, บะหมี่กึ่งสำเร็จรูป"
+                />
+              </div>
+
+              {/* Barcode & SKU */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-xs font-semibold">บาร์โค้ดสินค้า *</Label>
+                    <button
+                      type="button"
+                      className="text-[11px] text-primary hover:underline font-medium"
+                      onClick={() =>
+                        setEditingCartItem((prev) =>
+                          prev
+                            ? {
+                                ...prev,
+                                barcode: generateStoreBarcode("EAN_13").barcode,
+                              }
+                            : null,
+                        )
+                      }
+                    >
+                      ⚡ สุ่มบาร์โค้ด
+                    </button>
                   </div>
-                  <Badge variant="outline" className="text-[11px] font-medium shrink-0">
-                    {editingCartItem.zoneName} / {editingCartItem.categoryName}
-                  </Badge>
+                  <Input
+                    className="h-9 font-mono text-xs rounded-xl"
+                    value={editingCartItem.barcode}
+                    onChange={(e) =>
+                      setEditingCartItem((prev) =>
+                        prev ? { ...prev, barcode: e.target.value } : null,
+                      )
+                    }
+                    placeholder="รหัสบาร์โค้ด 13 หลัก"
+                  />
                 </div>
 
-                <div className="grid grid-cols-3 gap-2 pt-2 border-t text-xs text-center">
-                  <div className="bg-background p-1.5 rounded-lg border">
-                    <span className="text-[10px] text-muted-foreground block">สต็อกคงเหลือ</span>
-                    <span
-                      className={cn(
-                        "font-mono font-bold text-sm",
-                        editingCartItem.stock <= 0
-                          ? "text-destructive"
-                          : editingCartItem.stock <= editingCartItem.minStock
-                            ? "text-amber-600"
-                            : "text-foreground",
-                      )}
-                    >
-                      {editingCartItem.stock}
-                    </span>
-                  </div>
-                  <div className="bg-background p-1.5 rounded-lg border">
-                    <span className="text-[10px] text-muted-foreground block">จุดเตือนขั้นต่ำ</span>
-                    <span className="font-mono font-semibold text-sm text-muted-foreground">
-                      {editingCartItem.minStock}
-                    </span>
-                  </div>
-                  <div className="bg-background p-1.5 rounded-lg border">
-                    <span className="text-[10px] text-muted-foreground block">เป้าหมายสต็อก</span>
-                    <span className="font-mono font-semibold text-sm text-muted-foreground">
-                      {editingCartItem.targetStock || "-"}
-                    </span>
-                  </div>
+                <div className="space-y-1">
+                  <Label className="text-xs font-semibold">รหัส SKU</Label>
+                  <Input
+                    className="h-9 font-mono text-xs rounded-xl"
+                    value={editingCartItem.sku || ""}
+                    onChange={(e) =>
+                      setEditingCartItem((prev) => (prev ? { ...prev, sku: e.target.value } : null))
+                    }
+                    placeholder="เช่น SKU-001"
+                  />
                 </div>
               </div>
 
-              {/* Quantity & Unit Selection */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3.5 rounded-xl bg-card border">
-                {/* Quantity */}
+              {/* Category, Zone, Unit */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div className="space-y-1">
-                  <Label className="text-xs font-semibold">จำนวนสั่งซื้อ *</Label>
-                  <div className="flex items-center gap-1">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="icon"
-                      className="size-9 rounded-lg shrink-0 font-bold"
-                      onClick={() =>
-                        setEditingCartItem((prev) =>
-                          prev ? { ...prev, quantity: Math.max(1, prev.quantity - 1) } : null,
-                        )
-                      }
-                    >
-                      -
-                    </Button>
-                    <Input
-                      type="number"
-                      min="1"
-                      className="h-9 rounded-lg font-mono text-center font-bold text-sm"
-                      value={editingCartItem.quantity === 0 ? "" : editingCartItem.quantity}
-                      onChange={(e) => {
-                        const val = e.target.value === "" ? 0 : Number(e.target.value);
-                        setEditingCartItem((prev) =>
-                          prev ? { ...prev, quantity: isNaN(val) ? 1 : val } : null,
-                        );
-                      }}
-                      onBlur={() => {
-                        setEditingCartItem((prev) =>
-                          prev ? { ...prev, quantity: Math.max(1, prev.quantity || 1) } : null,
-                        );
-                      }}
-                    />
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="icon"
-                      className="size-9 rounded-lg shrink-0 font-bold"
-                      onClick={() =>
-                        setEditingCartItem((prev) =>
-                          prev ? { ...prev, quantity: prev.quantity + 1 } : null,
-                        )
-                      }
-                    >
-                      +
-                    </Button>
-                  </div>
+                  <Label className="text-xs font-semibold">หมวดหมู่สินค้า</Label>
+                  <CategorySelect
+                    value={editingCartItem.categoryId}
+                    onChange={(val) =>
+                      setEditingCartItem((prev) =>
+                        prev ? { ...prev, categoryId: val, categoryName: getCatName(val) } : null,
+                      )
+                    }
+                    className="h-9 text-xs rounded-xl"
+                  />
                 </div>
 
-                {/* Unit of Measure */}
                 <div className="space-y-1">
-                  <Label className="text-xs font-semibold">หน่วยนับ (Unit of Measure) *</Label>
+                  <Label className="text-xs font-semibold">โซนจัดเก็บ</Label>
+                  <ZoneSelect
+                    value={editingCartItem.zoneId}
+                    onChange={(val) =>
+                      setEditingCartItem((prev) =>
+                        prev
+                          ? {
+                              ...prev,
+                              zoneId: val,
+                              zoneName: zones.find((z) => z.id === val)?.name || "-",
+                            }
+                          : null,
+                      )
+                    }
+                    className="h-9 text-xs rounded-xl"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <Label className="text-xs font-semibold">หน่วยนับ *</Label>
                   <select
-                    className="w-full h-9 rounded-lg border border-input bg-background px-3 text-xs sm:text-sm font-semibold shadow-2xs cursor-pointer focus:ring-1 focus:ring-primary"
+                    className="w-full h-9 rounded-xl border border-input bg-background px-3 text-xs font-semibold shadow-2xs cursor-pointer focus:ring-1 focus:ring-primary"
                     value={editingCartItem.unitId}
                     onChange={(e) =>
                       setEditingCartItem((prev) =>
@@ -3668,94 +3655,157 @@ function ReorderPage() {
                 </div>
               </div>
 
-              {/* Quick Presets */}
-              <div className="flex items-center gap-1.5 flex-wrap px-1">
-                <span className="text-[10px] text-muted-foreground font-medium">
-                  เปลี่ยนจำนวนด่วน:
-                </span>
-                {[1, 6, 12, 24, 50, 100].map((preset) => (
-                  <button
-                    key={preset}
+              {/* Order Quantity Box */}
+              <div className="p-3 rounded-xl bg-card border space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs font-semibold text-primary">
+                    จำนวนสั่งซื้อในใบนี้ *
+                  </Label>
+                  <span className="text-[11px] text-muted-foreground">
+                    คงเหลือในร้าน:{" "}
+                    <strong className="font-mono text-foreground">{editingCartItem.stock}</strong>{" "}
+                    {getUnitName(editingCartItem.unitId)}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
                     type="button"
-                    className={cn(
-                      "px-2 py-0.5 rounded-md border text-[11px] font-mono font-medium transition-all",
-                      editingCartItem.quantity === preset
-                        ? "bg-primary text-primary-foreground border-primary"
-                        : "hover:bg-muted bg-background",
-                    )}
+                    variant="outline"
+                    size="icon"
+                    className="size-9 rounded-lg shrink-0 font-bold"
                     onClick={() =>
-                      setEditingCartItem((prev) => (prev ? { ...prev, quantity: preset } : null))
+                      setEditingCartItem((prev) =>
+                        prev ? { ...prev, quantity: Math.max(1, prev.quantity - 1) } : null,
+                      )
                     }
                   >
-                    {preset}
-                  </button>
-                ))}
+                    -
+                  </Button>
+                  <Input
+                    type="number"
+                    min="1"
+                    className="h-9 rounded-lg font-mono text-center font-bold text-sm"
+                    value={editingCartItem.quantity === 0 ? "" : editingCartItem.quantity}
+                    onChange={(e) => {
+                      const val = e.target.value === "" ? 0 : Number(e.target.value);
+                      setEditingCartItem((prev) =>
+                        prev ? { ...prev, quantity: isNaN(val) ? 1 : val } : null,
+                      );
+                    }}
+                    onBlur={() => {
+                      setEditingCartItem((prev) =>
+                        prev ? { ...prev, quantity: Math.max(1, prev.quantity || 1) } : null,
+                      );
+                    }}
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    className="size-9 rounded-lg shrink-0 font-bold"
+                    onClick={() =>
+                      setEditingCartItem((prev) =>
+                        prev ? { ...prev, quantity: prev.quantity + 1 } : null,
+                      )
+                    }
+                  >
+                    +
+                  </Button>
+                </div>
+
+                {/* Quick Presets */}
+                <div className="flex items-center gap-1.5 flex-wrap pt-1">
+                  <span className="text-[10px] text-muted-foreground font-medium">ทางลัด:</span>
+                  {[1, 6, 12, 24, 50, 100].map((preset) => (
+                    <button
+                      key={preset}
+                      type="button"
+                      className={cn(
+                        "px-2 py-0.5 rounded-md border text-[11px] font-mono font-medium transition-all",
+                        editingCartItem.quantity === preset
+                          ? "bg-primary text-primary-foreground border-primary"
+                          : "hover:bg-muted bg-background",
+                      )}
+                      onClick={() =>
+                        setEditingCartItem((prev) => (prev ? { ...prev, quantity: preset } : null))
+                      }
+                    >
+                      {preset}
+                    </button>
+                  ))}
+                </div>
               </div>
 
-              {/* Cost Price per Unit & Item Note */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3.5 rounded-xl bg-card border">
+              {/* Pricing & Minimum Stock */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-3 rounded-xl bg-muted/30 border">
                 <div className="space-y-1">
-                  <div className="flex items-center justify-between">
-                    <Label className="text-xs font-semibold">ราคาทุนต่อหน่วย (บาท)</Label>
-                    <span className="text-[10px] text-muted-foreground">
-                      เดิม: ฿{editingCartItem.masterCostPrice.toFixed(2)}
-                    </span>
-                  </div>
-                  <div className="relative">
-                    <span className="absolute left-2.5 top-2 text-xs text-muted-foreground">฿</span>
-                    <Input
-                      type="number"
-                      min="0"
-                      step="0.5"
-                      placeholder="0.00"
-                      className="pl-6 h-9 rounded-lg font-mono font-semibold text-xs"
-                      value={editingCartItem.costPrice === 0 ? "" : editingCartItem.costPrice}
-                      onChange={(e) => {
-                        const val = e.target.value === "" ? 0 : Number(e.target.value);
-                        setEditingCartItem((prev) =>
-                          prev ? { ...prev, costPrice: isNaN(val) ? 0 : val } : null,
-                        );
-                      }}
-                    />
-                  </div>
+                  <Label className="text-xs font-semibold">ราคาทุน/หน่วย (฿)</Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    step="0.5"
+                    className="h-9 rounded-xl font-mono text-xs bg-background"
+                    value={editingCartItem.costPrice === 0 ? "" : editingCartItem.costPrice}
+                    onChange={(e) => {
+                      const val = e.target.value === "" ? 0 : Number(e.target.value);
+                      setEditingCartItem((prev) =>
+                        prev ? { ...prev, costPrice: isNaN(val) ? 0 : val } : null,
+                      );
+                    }}
+                  />
                 </div>
 
                 <div className="space-y-1">
-                  <Label className="text-xs font-semibold">หมายเหตุเฉพาะรายการ (ไม่บังคับ)</Label>
+                  <Label className="text-xs font-semibold">ราคาขายหน้าร้าน (฿)</Label>
                   <Input
-                    placeholder="เช่น ขอของแถม, ส่งด่วน, ขอล็อตใหม่"
-                    className="h-9 rounded-lg text-xs"
-                    value={editingCartItem.note}
-                    onChange={(e) =>
+                    type="number"
+                    min="0"
+                    step="0.5"
+                    className="h-9 rounded-xl font-mono text-xs bg-background"
+                    value={editingCartItem.sellPrice === 0 ? "" : editingCartItem.sellPrice}
+                    onChange={(e) => {
+                      const val = e.target.value === "" ? 0 : Number(e.target.value);
                       setEditingCartItem((prev) =>
-                        prev ? { ...prev, note: e.target.value } : null,
-                      )
-                    }
+                        prev ? { ...prev, sellPrice: isNaN(val) ? 0 : val } : null,
+                      );
+                    }}
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <Label className="text-xs font-semibold">จุดเตือนสต็อกขั้นต่ำ</Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    className="h-9 rounded-xl font-mono text-xs bg-background"
+                    value={editingCartItem.minStock === 0 ? "" : editingCartItem.minStock}
+                    onChange={(e) => {
+                      const val = e.target.value === "" ? 0 : Number(e.target.value);
+                      setEditingCartItem((prev) =>
+                        prev ? { ...prev, minStock: isNaN(val) ? 0 : val } : null,
+                      );
+                    }}
                   />
                 </div>
               </div>
 
-              {/* Master Cost Update Option */}
-              <div className="flex items-center gap-2 p-2.5 rounded-xl bg-muted/40 border">
-                <input
-                  type="checkbox"
-                  id="chkUpdateMasterCost"
-                  checked={updateMasterCostPrice}
-                  onChange={(e) => setUpdateMasterCostPrice(e.target.checked)}
-                  className="size-4 rounded border-input text-primary focus:ring-primary cursor-pointer"
+              {/* Note */}
+              <div className="space-y-1">
+                <Label className="text-xs font-semibold">หมายเหตุเฉพาะรายการ (ไม่บังคับ)</Label>
+                <Input
+                  placeholder="เช่น ขอของแถม, ส่งด่วน, ขอล็อตผลิตใหม่"
+                  className="h-9 rounded-xl text-xs"
+                  value={editingCartItem.note}
+                  onChange={(e) =>
+                    setEditingCartItem((prev) => (prev ? { ...prev, note: e.target.value } : null))
+                  }
                 />
-                <Label
-                  htmlFor="chkUpdateMasterCost"
-                  className="text-xs cursor-pointer font-medium text-foreground select-none"
-                >
-                  อัปเดตราคาทุนนี้ไปยังข้อมูลสินค้าหลัก ({editingCartItem.productName}) ด้วย
-                </Label>
               </div>
 
               {/* Subtotal Calculation Box */}
               <div className="flex justify-between items-center p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/25 text-xs font-semibold">
                 <div className="text-emerald-800 dark:text-emerald-200">
-                  <span>สรุปยอดรายการ: </span>
+                  <span>สรุปยอดรายการนี้: </span>
                   <span className="font-bold">
                     {editingCartItem.quantity} {getUnitName(editingCartItem.unitId)} × ฿
                     {Number(editingCartItem.costPrice).toFixed(2)}
@@ -3776,7 +3826,7 @@ function ReorderPage() {
             {editingCartItem && (
               <Button
                 variant="destructive"
-                className="h-11 rounded-xl text-xs sm:mr-auto"
+                className="h-10 rounded-xl text-xs sm:mr-auto"
                 onClick={() => {
                   handleRemoveOrder(editingCartItem.productId);
                   setEditItemModalOpen(false);
@@ -3788,16 +3838,16 @@ function ReorderPage() {
             )}
             <Button
               variant="outline"
-              className="h-11 rounded-xl w-full sm:w-auto text-xs"
+              className="h-10 rounded-xl w-full sm:w-auto text-xs"
               onClick={() => setEditItemModalOpen(false)}
             >
               ยกเลิก
             </Button>
             <Button
-              className="h-11 rounded-xl w-full sm:w-auto font-semibold gap-1.5 bg-primary text-primary-foreground shadow-xs text-xs"
+              className="h-10 rounded-xl w-full sm:w-auto font-semibold gap-1.5 bg-primary text-primary-foreground shadow-xs text-xs"
               onClick={handleSaveEditItem}
             >
-              <Save className="size-4" /> บันทึกการแก้ไข
+              <Save className="size-4" /> บันทึกข้อมูลสินค้า &amp; อัปเดตใบสั่งซื้อ
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -4582,7 +4632,7 @@ function ReorderPage() {
                   <button
                     type="button"
                     className="text-[11px] text-primary hover:underline font-medium"
-                    onClick={() => setQuickBarcode(generateStoreBarcode("EAN_13"))}
+                    onClick={() => setQuickBarcode(generateStoreBarcode("EAN_13").barcode)}
                   >
                     ⚡ สุ่มบาร์โค้ด
                   </button>
