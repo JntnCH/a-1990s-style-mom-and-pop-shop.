@@ -1058,14 +1058,14 @@ function ProductsPage() {
           setModalOpen(open);
         }}
       >
-        <DialogContent className="w-[95vw] max-w-2xl rounded-2xl max-h-[92vh] overflow-y-auto p-4 sm:p-6">
+        <DialogContent className="w-[calc(100vw-1rem)] max-w-2xl min-w-0 rounded-2xl max-h-[calc(100dvh-1rem)] overflow-x-hidden overflow-y-auto p-4 sm:p-6">
           <DialogHeader className="pb-2">
             <DialogTitle className="text-base sm:text-lg flex items-center justify-between">
-              <span className="flex items-center gap-2">
+              <span className="flex min-w-0 flex-1 items-center gap-2 truncate">
                 <Package className="size-5 text-primary" />
                 {editingProduct ? `แก้ไขข้อมูลสินค้า: ${editingProduct.name}` : "เพิ่มสินค้าใหม่"}
               </span>
-              <div className="flex items-center gap-2">
+              <div className="flex shrink-0 items-center gap-2">
                 <Button
                   type="button"
                   variant="ghost"
@@ -1099,9 +1099,9 @@ function ProductsPage() {
             </Alert>
           )}
 
-          <div className="space-y-4 py-1">
+          <div className="min-w-0 space-y-4 py-1">
             {/* PROMINENT SCANNER CONTROL BAR (LARGE BUTTONS) */}
-            <div className="rounded-2xl border-2 border-primary/30 bg-primary/5 p-3 space-y-3">
+            <div className="min-w-0 space-y-3">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                 <div className="flex items-center gap-2">
                   <ScanLine className="size-5 text-primary" />
@@ -1134,7 +1134,7 @@ function ProductsPage() {
                 type="button"
                 size="lg"
                 variant={scannerActive ? "destructive" : "default"}
-                className={`w-full h-12 sm:h-13 rounded-xl font-bold text-sm sm:text-base gap-2 shadow-sm transition-all active:scale-98 ${
+                  className={`w-full min-w-0 h-12 sm:h-13 rounded-xl font-bold text-sm sm:text-base gap-2 shadow-none transition-all active:scale-98 ${
                   !scannerActive
                     ? "bg-primary hover:bg-primary/90 text-primary-foreground"
                     : "bg-destructive hover:bg-destructive/90 text-destructive-foreground"
@@ -1305,7 +1305,7 @@ function ProductsPage() {
             </div>
 
             {/* Section 5: Prices */}
-            <div className="grid grid-cols-2 gap-3 p-3.5 rounded-2xl bg-muted/40 border">
+            <div className="grid min-w-0 grid-cols-2 gap-3 border-y py-3">
               <div className="space-y-1.5">
                 <Label className="text-xs font-semibold">ราคาทุน (บาท)</Label>
                 <Input
@@ -1331,7 +1331,7 @@ function ProductsPage() {
             </div>
 
             {/* Section 6: Inventory & Reorder Management */}
-            <div className="grid grid-cols-3 gap-2.5">
+            <div className="grid min-w-0 grid-cols-2 gap-2.5 sm:grid-cols-3">
               <div className="space-y-1.5">
                 <Label className="text-xs text-muted-foreground">คงเหลือปัจจุบัน</Label>
                 <Input
@@ -1369,14 +1369,18 @@ function ProductsPage() {
             </div>
 
             {/* Section 7: Status Toggle Switch */}
-            <div className="flex items-center justify-between p-3.5 rounded-2xl border bg-background">
-              <div className="space-y-0.5">
+            <div className="flex items-center justify-between gap-3 border-y py-3">
+              <div className="min-w-0 space-y-0.5">
                 <Label className="text-sm font-semibold">สถานะสินค้า (เปิดขาย)</Label>
                 <p className="text-xs text-muted-foreground">
                   หากปิดการใช้งาน สินค้าจะไม่แสดงในรายการรับเข้า/จ่ายออก
                 </p>
               </div>
-              <Switch checked={formIsActive} onCheckedChange={setFormIsActive} />
+              <Switch
+                className="shrink-0"
+                checked={formIsActive}
+                onCheckedChange={setFormIsActive}
+              />
             </div>
           </div>
 

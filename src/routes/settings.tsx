@@ -79,6 +79,7 @@ import {
   getLineServerConfigFn,
   registerLineFollowerFn,
   sendMiniAppPortalCardFn,
+  syncLineFollowersFn,
   syncMasterDatabaseFn,
 } from "@/lib/line-server-fn";
 import {
@@ -179,9 +180,34 @@ function SettingsPage() {
     setFollowers(MasterStore.getFollowers());
   }, []);
 
-  const syncWithCentralServer = useCallback(async () => {
+  const syncWithCentralServer = useCallback(async (syncLiveLineFollowers = false) => {
     setIsSyncing(true);
+    let lineSyncError = "";
+    let lineSyncCount = 0;
     try {
+      if (syncLiveLineFollowers) {
+        const lineResult = await syncLineFollowersFn();
+        if (lineResult.success) {
+          lineSyncCount = lineResult.count;
+          const mergedFollowers = new Map(
+            MasterStore.getFollowers().map((follower) => [follower.userId, follower]),
+          );
+          lineResult.followers.forEach((follower) => {
+            const savedFollower = mergedFollowers.get(follower.userId);
+            mergedFollowers.set(follower.userId, {
+              ...savedFollower,
+              ...follower,
+              role: savedFollower?.role ?? "viewer",
+            });
+          });
+          const followerList = [...mergedFollowers.values()];
+          MasterStore.saveFollowers(followerList);
+          setFollowers(followerList);
+        } else {
+          lineSyncError = lineResult.message;
+        }
+      }
+
       const res = await syncMasterDatabaseFn({
         data: {
           products: MasterStore.getProducts(),
@@ -218,11 +244,17 @@ function SettingsPage() {
         if (res.data.followers && res.data.followers.length > 0) {
           setFollowers(res.data.followers as LineUserFollower[]);
         }
-        setSyncStatusMsg("ข้อมูลประสานตรงกันเรียบร้อยแล้ว (All Data Synchronized)");
+        setSyncStatusMsg(
+            lineSyncError ||
+            (syncLiveLineFollowers
+              ? `ซิงค์ผู้ติดตาม LINE OA สำเร็จ ${lineSyncCount} รายการ`
+              : "ข้อมูลประสานตรงกันเรียบร้อยแล้ว (All Data Synchronized)"),
+        );
         setTimeout(() => setSyncStatusMsg(""), 4000);
       }
     } catch (err) {
       console.error("Sync error", err);
+      setSyncStatusMsg(lineSyncError || "ซิงค์ข้อมูลไม่สำเร็จ กรุณาลองใหม่อีกครั้ง");
     } finally {
       setIsSyncing(false);
     }
@@ -332,7 +364,7 @@ function SettingsPage() {
   const handleOpenAddFollower = () => {
     setEditingFollower(null);
     setFollowerForm({
-      userId: `U${Math.random().toString(36).substring(2, 10)}${Math.random().toString(36).substring(2, 10)}`,
+      userId: "",
       displayName: "",
       pictureUrl: "",
       statusMessage: "",
@@ -624,7 +656,10 @@ function SettingsPage() {
                   Bot (User ID)
                 </h2>
                 <p className="text-xs text-muted-foreground">
-                  ฐานข้อมูลผู้ใช้งาน, LINE User ID, สิทธิ์การใช้งาน และบันทึกประวัติการปฏิสัมพันธ์
+                  รายชื่อที่บันทึกไว้ในระบบ พร้อม LINE User ID และสิทธิ์การใช้งาน
+                </p>
+                <p className="mt-1 text-[11px] text-muted-foreground">
+                  ซิงค์ผู้ติดตาม LINE OA จริงได้เมื่อมี Channel Access Token และบัญชี Verified/Premium; กลุ่มแชตต้องเพิ่มด้วย Group ID
                 </p>
               </div>
               <div className="flex items-center gap-2">
@@ -632,13 +667,13 @@ function SettingsPage() {
                   variant="outline"
                   size="sm"
                   className="h-10 text-xs gap-1.5 rounded-xl"
-                  onClick={syncWithCentralServer}
+                  onClick={() => void syncWithCentralServer(true)}
                   disabled={isSyncing}
                 >
                   <RefreshCw
                     className={`size-3.5 ${isSyncing ? "animate-spin text-primary" : ""}`}
                   />
-                  {isSyncing ? "กำลังประสาน..." : "ซิงค์ฐานข้อมูล"}
+                  {isSyncing ? "กำลังซิงค์..." : "ซิงค์ LINE จริง"}
                 </Button>
                 <Button
                   className="h-10 font-semibold gap-1.5 rounded-xl active:scale-95 shadow-sm"
@@ -654,7 +689,8 @@ function SettingsPage() {
               {followers.length === 0 ? (
                 <Card className="rounded-2xl p-6 text-center text-muted-foreground">
                   <Users className="size-8 mx-auto mb-2 opacity-40" />
-                  <p className="text-sm">ยังไม่มีข้อมูลผู้ใช้งาน</p>
+                  <p className="text-sm">ยังไม่มีบัญชี LINE ที่บันทึกไว้</p>
+                  <p className="mt-1 text-xs">เพิ่มด้วย User ID หรือ Group ID ที่ตรวจสอบแล้ว</p>
                 </Card>
               ) : (
                 followers.map((u) => (
@@ -728,7 +764,7 @@ function SettingsPage() {
                       {followers.length === 0 ? (
                         <TableRow>
                           <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
-                            ยังไม่มีประวัติผู้ใช้งาน
+                            ยังไม่มีบัญชี LINE ที่บันทึกไว้
                           </TableCell>
                         </TableRow>
                       ) : (
@@ -1624,7 +1660,7 @@ function SettingsPage() {
                   : "เพิ่มผู้ใช้งาน / LINE User ID"}
               </DialogTitle>
               <DialogDescription className="text-xs">
-                ระบุ LINE User ID เพื่อใช้ส่งการแจ้งเตือนสต็อกและใบสั่งซื้อสินค้าโดยตรง
+                กรอก LINE User ID หรือ Group ID จริงจากข้อมูลของ LINE เพื่อใช้ส่งการแจ้งเตือน
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-3 py-2">
@@ -1642,7 +1678,7 @@ function SettingsPage() {
               <div className="space-y-1.5">
                 <Label className="text-xs font-semibold">LINE User ID *</Label>
                 <Input
-                  placeholder="เช่น U88f0192a83b27b9c1..."
+                  placeholder="วาง LINE User ID / Group ID ที่ตรวจสอบแล้ว"
                   className="h-10 font-mono text-xs rounded-xl"
                   value={followerForm.userId}
                   onChange={(e) => setFollowerForm({ ...followerForm, userId: e.target.value })}
