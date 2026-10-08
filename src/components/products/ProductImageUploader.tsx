@@ -225,12 +225,12 @@ export function ProductImageUploader({
         </div>
       ) : (
         /* Large Touch-Friendly Image Picker Buttons */
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid min-w-0 grid-cols-3 gap-1.5">
           {/* Option 1: Camera Photo */}
           <Button
             type="button"
-            variant="outline"
-            className="h-20 sm:h-22 rounded-2xl flex flex-col items-center justify-center gap-1.5 border-dashed border-2 hover:border-primary/60 hover:bg-primary/5 active:scale-98 transition-all p-2 text-center"
+            variant="ghost"
+            className="h-auto min-h-11 min-w-0 w-full flex-col items-center justify-center gap-1 rounded-lg px-1 py-2 text-center hover:bg-primary/5 sm:flex-row sm:gap-1.5"
             onClick={() => {
               if (typeof navigator !== "undefined" && navigator.mediaDevices?.getUserMedia) {
                 void startLiveCamera();
@@ -240,41 +240,41 @@ export function ProductImageUploader({
             }}
             disabled={isProcessing}
           >
-            <div className="size-8 rounded-full bg-primary/10 text-primary flex items-center justify-center">
-              <Camera className="size-4" />
-            </div>
-            <span className="text-xs font-semibold text-foreground">ถ่ายรูปด้วยกล้อง</span>
+            <Camera className="size-4 shrink-0 text-primary" />
+            <span className="min-w-0 break-words text-[11px] font-semibold leading-tight text-foreground sm:text-xs">
+              ถ่ายรูปด้วยกล้อง
+            </span>
           </Button>
 
           {/* Option 2: Upload File */}
           <Button
             type="button"
-            variant="outline"
-            className="h-20 sm:h-22 rounded-2xl flex flex-col items-center justify-center gap-1.5 border-dashed border-2 hover:border-primary/60 hover:bg-primary/5 active:scale-98 transition-all p-2 text-center"
+            variant="ghost"
+            className="h-auto min-h-11 min-w-0 w-full flex-col items-center justify-center gap-1 rounded-lg px-1 py-2 text-center hover:bg-primary/5 sm:flex-row sm:gap-1.5"
             onClick={() => fileInputRef.current?.click()}
             disabled={isProcessing}
           >
-            <div className="size-8 rounded-full bg-emerald-500/10 text-emerald-600 flex items-center justify-center">
-              <FolderOpen className="size-4" />
-            </div>
-            <span className="text-xs font-semibold text-foreground">เลือกไฟล์รูป</span>
+            <FolderOpen className="size-4 shrink-0 text-emerald-600" />
+            <span className="min-w-0 break-words text-[11px] font-semibold leading-tight text-foreground sm:text-xs">
+              เลือกไฟล์รูป
+            </span>
           </Button>
 
           {/* Option 3: URL Link */}
           <Button
             type="button"
-            variant="outline"
-            className="h-20 sm:h-22 rounded-2xl flex flex-col items-center justify-center gap-1.5 border-dashed border-2 hover:border-primary/60 hover:bg-primary/5 active:scale-98 transition-all p-2 text-center"
+            variant="ghost"
+            className="h-auto min-h-11 min-w-0 w-full flex-col items-center justify-center gap-1 rounded-lg px-1 py-2 text-center hover:bg-primary/5 sm:flex-row sm:gap-1.5"
             onClick={() => {
               setManualUrl(value);
               setUrlInputOpen(true);
             }}
             disabled={isProcessing}
           >
-            <div className="size-8 rounded-full bg-blue-500/10 text-blue-600 flex items-center justify-center">
-              <LinkIcon className="size-4" />
-            </div>
-            <span className="text-xs font-semibold text-foreground">ใส่ลิงก์ URL</span>
+            <LinkIcon className="size-4 shrink-0 text-blue-600" />
+            <span className="min-w-0 break-words text-[11px] font-semibold leading-tight text-foreground sm:text-xs">
+              ใส่ลิงก์ URL
+            </span>
           </Button>
         </div>
       )}

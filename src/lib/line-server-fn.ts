@@ -10,6 +10,7 @@ import {
   type DBProductItem,
   type DBPurchaseOrder,
 } from "../db/db-service.ts";
+import { removeLegacySampleLineFollowers } from "./line-follower-data";
 
 export interface SendLineOrderPayload {
   toUserIdOrGroupId?: string | undefined;
@@ -54,81 +55,23 @@ const globalServerDatabase: {
   purchaseOrders?: unknown[] | undefined;
 } = {
   lastUpdated: new Date().toISOString(),
-  followers: [
-    {
-      userId: "C112233445566778899",
-      displayName: "กลุ่มไลน์สั่งซื้อสินค้า (PO Store Group)",
-      pictureUrl:
-        "https://images.unsplash.com/photo-1522071820081-009f0129c71c?w=120&auto=format&fit=crop&q=80",
-      statusMessage: "กลุ่มแชทไลน์สำหรับรับใบสั่งซื้อหน้าร้าน",
-      followedAt: "2026-09-23 09:00 น.",
-      lastInteractionAt: "2026-09-27 10:00 น.",
-      role: "viewer",
-    },
-    {
-      userId: "U77b8899aabbccdde1",
-      displayName: "บริษัท ยูนิลีเวอร์ (Unilever Supplier)",
-      pictureUrl:
-        "https://images.unsplash.com/photo-1560250097-0b93528c311a?w=120&auto=format&fit=crop&q=80",
-      statusMessage: "ตัวแทนจำหน่ายสินค้าอุปโภคบริโภคหลัก",
-      followedAt: "2026-09-22 11:20 น.",
-      lastInteractionAt: "2026-09-26 14:10 น.",
-      role: "staff",
-    },
-    {
-      userId: "U55c66778899aabb11",
-      displayName: "เจริญทรัพย์ค้าส่ง ยี่ปั๊ว (Wholesale)",
-      pictureUrl:
-        "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=120&auto=format&fit=crop&q=80",
-      statusMessage: "ร้านค้าส่งยี่ปั๊ว ประจำอำเภอ ส่งของทุกวันอังคาร/ศุกร์",
-      followedAt: "2026-09-21 14:00 น.",
-      lastInteractionAt: "2026-09-26 09:30 น.",
-      role: "staff",
-    },
-    {
-      userId: "U44d5566778899aabb",
-      displayName: "ตัวแทนจำหน่ายเครื่องดื่ม (Beverage Rep)",
-      pictureUrl:
-        "https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=120&auto=format&fit=crop&q=80",
-      statusMessage: "ฝ่ายขาย บ.เครื่องดื่มและขนมขบเคี้ยว",
-      followedAt: "2026-09-23 15:00 น.",
-      lastInteractionAt: "2026-09-27 11:20 น.",
-      role: "staff",
-    },
-    {
-      userId: "C998877665544332211",
-      displayName: "กลุ่มไลน์พนักงานจัดซื้อ (Purchasing Team)",
-      pictureUrl:
-        "https://images.unsplash.com/photo-1556761175-5973dc0f32e7?w=120&auto=format&fit=crop&q=80",
-      statusMessage: "ทีมสั่งของและตรวจรับสต็อกประจำร้าน",
-      followedAt: "2026-09-24 10:00 น.",
-      lastInteractionAt: "2026-09-27 12:00 น.",
-      role: "viewer",
-    },
-    {
-      userId: "U88f0192a83b27b9c1",
-      displayName: "ผู้ดูแลร้าน (Admin Master)",
-      pictureUrl:
-        "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&auto=format&fit=crop&q=80",
-      statusMessage: "ประจำหน้าร้าน โชห่วยยุค 90s",
-      followedAt: "2026-09-20 08:30 น.",
-      lastInteractionAt: "2026-09-25 10:15 น.",
-      role: "admin",
-    },
-    {
-      userId: "U99e1234c56d78a9b2",
-      displayName: "พนักงานสต็อก (Staff Store)",
-      pictureUrl:
-        "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=120&auto=format&fit=crop&q=80",
-      statusMessage: "รับสินค้าเข้าโกดัง",
-      followedAt: "2026-09-21 09:00 น.",
-      lastInteractionAt: "2026-09-24 16:40 น.",
-      role: "staff",
-    },
-  ],
+  followers: [],
 };
 
 export const DEFAULT_LINE_LIFF_ID = "2011710264-gaZ7oEcK";
+
+function getLineChannelAccessToken(): string {
+  return (
+    process.env["LINE_CHANNEL_ACCESS_TOKEN"] ||
+    process.env["LINE_ACCESS_TOKEN"] ||
+    process.env["LINE_TOKEN"] ||
+    process.env["CHANNEL_ACCESS_TOKEN"] ||
+    process.env["ACCESS_TOKEN"] ||
+    process.env["LINE_BOT_TOKEN"] ||
+    process.env["LINE_MESSAGING_TOKEN"] ||
+    ""
+  ).trim();
+}
 
 export const getLineServerConfigFn = createServerFn({ method: "GET" }).handler(async () => {
   const envLiff = (
@@ -142,15 +85,7 @@ export const getLineServerConfigFn = createServerFn({ method: "GET" }).handler(a
   ).trim();
   const validLiff = envLiff && envLiff !== "xxxxx-xxxxx" ? envLiff : DEFAULT_LINE_LIFF_ID;
 
-  const hasAccessToken = Boolean(
-    process.env["LINE_CHANNEL_ACCESS_TOKEN"] ||
-    process.env["LINE_ACCESS_TOKEN"] ||
-    process.env["LINE_TOKEN"] ||
-    process.env["CHANNEL_ACCESS_TOKEN"] ||
-    process.env["ACCESS_TOKEN"] ||
-    process.env["LINE_BOT_TOKEN"] ||
-    process.env["LINE_MESSAGING_TOKEN"],
-  );
+  const hasAccessToken = Boolean(getLineChannelAccessToken());
 
   return {
     hasChannelId: Boolean(process.env["LINE_CHANNEL_ID"] || process.env["CHANNEL_ID"]),
@@ -221,22 +156,39 @@ export const syncMasterDatabaseFn = createServerFn({ method: "POST" })
                 scannedAt: string;
               }[]
             | undefined,
-          followers: data.followers as ServerLineFollower[] | undefined,
+          followers: removeLegacySampleLineFollowers(data.followers).map((follower) => ({
+            userId: follower.userId,
+            displayName: follower.displayName,
+            ...(follower.pictureUrl === undefined ? {} : { pictureUrl: follower.pictureUrl }),
+            ...(follower.statusMessage === undefined
+              ? {}
+              : { statusMessage: follower.statusMessage }),
+            ...(follower.role === undefined ? {} : { role: follower.role }),
+            ...(follower.followedAt === undefined ? {} : { followedAt: follower.followedAt }),
+            ...(follower.lastInteractionAt === undefined
+              ? {}
+              : { lastInteractionAt: follower.lastInteractionAt }),
+          })),
         });
+
+        const syncedFollowers = removeLegacySampleLineFollowers(
+          sqlSnapshot.followers as ServerLineFollower[] | undefined,
+        );
+        const sanitizedSnapshot = { ...sqlSnapshot, followers: syncedFollowers };
 
         globalServerDatabase.products = sqlSnapshot.products;
         globalServerDatabase.categories = sqlSnapshot.categories;
         globalServerDatabase.zones = sqlSnapshot.zones;
         globalServerDatabase.units = sqlSnapshot.units;
         globalServerDatabase.receives = sqlSnapshot.receives;
-        globalServerDatabase.followers = sqlSnapshot.followers as ServerLineFollower[];
+        globalServerDatabase.followers = syncedFollowers;
         globalServerDatabase.movements = sqlSnapshot.movements;
         globalServerDatabase.purchaseOrders = sqlSnapshot.purchaseOrders;
         globalServerDatabase.lastUpdated = new Date().toISOString();
 
         return {
           success: true,
-          data: sqlSnapshot,
+          data: sanitizedSnapshot,
           lastUpdated: globalServerDatabase.lastUpdated,
           source: "cloudsql",
         };
@@ -263,7 +215,7 @@ export const syncMasterDatabaseFn = createServerFn({ method: "POST" })
     }
     if (data.followers && Array.isArray(data.followers)) {
       // Merge unique followers by userId
-      data.followers.forEach((f) => {
+      removeLegacySampleLineFollowers(data.followers).forEach((f) => {
         const existingIdx = globalServerDatabase.followers.findIndex(
           (ef) => ef.userId === f.userId,
         );
@@ -298,11 +250,134 @@ export const syncMasterDatabaseFn = createServerFn({ method: "POST" })
  * Get Server Follower History & User IDs
  */
 export const getLineFollowersHistoryFn = createServerFn({ method: "GET" }).handler(async () => {
+  globalServerDatabase.followers = removeLegacySampleLineFollowers(globalServerDatabase.followers);
   return {
     success: true,
     followers: globalServerDatabase.followers,
     count: globalServerDatabase.followers.length,
   };
+});
+
+/** Sync verified LINE Official Account followers and their public profiles. */
+export const syncLineFollowersFn = createServerFn({ method: "POST" }).handler(async () => {
+  const accessToken = getLineChannelAccessToken();
+  if (!accessToken) {
+    return {
+      success: false as const,
+      message: "ยังไม่ได้ตั้งค่า LINE_CHANNEL_ACCESS_TOKEN ฝั่งเซิร์ฟเวอร์",
+    };
+  }
+
+  const userIds: string[] = [];
+  let cursor: string | undefined;
+  const maxPages = 20;
+
+  try {
+    for (let page = 0; page < maxPages; page += 1) {
+      const url = new URL("https://api.line.me/v2/bot/followers/ids");
+      url.searchParams.set("limit", "1000");
+      if (cursor) url.searchParams.set("start", cursor);
+
+      const response = await fetch(url, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      if (!response.ok) {
+        if (response.status === 403) {
+          return {
+            success: false as const,
+            message:
+              "LINE ปฏิเสธการอ่านรายชื่อ: ตรวจ Channel Access Token และสถานะ Official Account (ต้องเป็นบัญชี Verified หรือ Premium)",
+          };
+        }
+        if (response.status === 401) {
+          return {
+            success: false as const,
+            message: "LINE Channel Access Token ไม่ถูกต้องหรือหมดอายุ กรุณาตรวจสอบค่า server secret",
+          };
+        }
+        return {
+          success: false as const,
+          message: `เรียก LINE API ไม่สำเร็จ (HTTP ${response.status})`,
+        };
+      }
+
+      const pageData = (await response.json()) as { userIds?: unknown; next?: unknown };
+      const pageUserIds = Array.isArray(pageData.userIds)
+        ? pageData.userIds.filter((userId): userId is string => typeof userId === "string")
+        : [];
+      userIds.push(...pageUserIds);
+
+      cursor = typeof pageData.next === "string" ? pageData.next : undefined;
+      if (!cursor) break;
+      if (page === maxPages - 1) {
+        return {
+          success: false as const,
+          message: "พบผู้ติดตามมากกว่า 20,000 รายการ จึงหยุดซิงค์เพื่อป้องกันการดึงข้อมูลเกินจำเป็น",
+        };
+      }
+    }
+
+    const uniqueUserIds = [...new Set(userIds)];
+    const syncedAt = new Date().toLocaleString("th-TH");
+    const profiles: ServerLineFollower[] = new Array(uniqueUserIds.length);
+    let nextIndex = 0;
+
+    const workers = Array.from({ length: Math.min(8, uniqueUserIds.length) }, async () => {
+      while (nextIndex < uniqueUserIds.length) {
+        const index = nextIndex;
+        nextIndex += 1;
+        const userId = uniqueUserIds[index];
+        if (!userId) continue;
+        const existing = globalServerDatabase.followers.find((follower) => follower.userId === userId);
+
+        try {
+          const profileResponse = await fetch(
+            `https://api.line.me/v2/bot/profile/${encodeURIComponent(userId)}`,
+            { headers: { Authorization: `Bearer ${accessToken}` } },
+          );
+          const profile = profileResponse.ok
+            ? ((await profileResponse.json()) as {
+                displayName?: string;
+                pictureUrl?: string;
+                statusMessage?: string;
+              })
+            : undefined;
+
+          profiles[index] = {
+            userId,
+            displayName: profile?.displayName?.trim() || userId,
+            pictureUrl: profile?.pictureUrl,
+            statusMessage: profile?.statusMessage,
+            followedAt: existing?.followedAt || "ไม่ระบุวันที่จาก LINE",
+            lastInteractionAt: syncedAt,
+            role: existing?.role || "viewer",
+          };
+        } catch {
+          profiles[index] = {
+            userId,
+            displayName: userId,
+            followedAt: existing?.followedAt || "ไม่ระบุวันที่จาก LINE",
+            lastInteractionAt: syncedAt,
+            role: existing?.role || "viewer",
+          };
+        }
+      }
+    });
+
+    await Promise.all(workers);
+    const currentFollowers = removeLegacySampleLineFollowers(globalServerDatabase.followers);
+    const mergedFollowers = new Map(currentFollowers.map((follower) => [follower.userId, follower]));
+    profiles.forEach((profile) => mergedFollowers.set(profile.userId, profile));
+    globalServerDatabase.followers = [...mergedFollowers.values()];
+
+    return { success: true as const, followers: profiles, count: profiles.length };
+  } catch (error) {
+    console.error("LINE follower sync failed", error);
+    return {
+      success: false as const,
+      message: "เชื่อมต่อ LINE ไม่สำเร็จ กรุณาลองใหม่อีกครั้ง",
+    };
+  }
 });
 
 /**
