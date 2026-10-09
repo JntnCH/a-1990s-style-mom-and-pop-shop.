@@ -37,11 +37,14 @@ export interface PurchaseOrderFlexOptions {
   customBaseUrl?: string;
   groupBy?: FlexItemGroupBy;
   showGroupHeaders?: boolean;
+  fontSize?: "large" | "medium";
+  separateQuantityUnit?: boolean;
 }
 
 /**
  * สร้าง Flex Message Bubble สำหรับใบสั่งซื้อสินค้าประจำวัน
- * รูปแบบแสดงผล: จัดกลุ่มตามโซน/หมวดหมู่ -> รายการ -> จำนวน -> หน่วยนับ พร้อมยอดรวมและมูลค่าโดยประมาณ
+ * รูปแบบแสดงผล: แยกคอลัมน์ [รายการ] [จำนวน] [หน่วยนับ] ออกจากกันชัดเจน พร้อมข้อความขนาดใหญ่
+ * จัดกลุ่มตามโซน/หมวดหมู่ พร้อมยอดรวมและมูลค่าโดยประมาณ
  * พร้อมปุ่มลัดสำหรับเปิดหน้าแดชบอร์ดหลัก และเปิดดูใบสั่งซื้อ
  */
 export function createPurchaseOrderFlexBubble(
@@ -49,6 +52,8 @@ export function createPurchaseOrderFlexBubble(
   options: PurchaseOrderFlexOptions = {},
 ) {
   const storeName = getSystemStoreName(options.storeName);
+  const isLargeFont = options.fontSize !== "medium";
+  const separateQuantityUnit = options.separateQuantityUnit !== false;
 
   const now = new Date();
   const dateStr =
@@ -103,7 +108,7 @@ export function createPurchaseOrderFlexBubble(
           {
             type: "text",
             text: grp.headerTitle,
-            size: "xs",
+            size: isLargeFont ? "sm" : "xs",
             color: "#1e293b",
             weight: "bold",
             wrap: true,
@@ -112,7 +117,7 @@ export function createPurchaseOrderFlexBubble(
           {
             type: "text",
             text: `${grp.items.length} รายการ`,
-            size: "xxs",
+            size: isLargeFont ? "xs" : "xxs",
             color: "#64748b",
             align: "end",
             weight: "bold",
@@ -124,32 +129,73 @@ export function createPurchaseOrderFlexBubble(
 
     grp.items.forEach(({ item }) => {
       globalIndex++;
-      itemRows.push({
-        type: "box",
-        layout: "horizontal",
-        spacing: "sm",
-        margin: "xs",
-        contents: [
-          {
-            type: "text",
-            text: `${globalIndex}. ${item.name}`,
-            size: "sm",
-            color: "#1f2937",
-            flex: 6,
-            wrap: true,
-          },
-          {
-            type: "text",
-            text: `${item.quantity} ${item.unitName}`,
-            size: "sm",
-            color: "#059669",
-            weight: "bold",
-            align: "end",
-            flex: 4,
-            wrap: true,
-          },
-        ],
-      });
+      if (separateQuantityUnit) {
+        itemRows.push({
+          type: "box",
+          layout: "horizontal",
+          spacing: "sm",
+          margin: "sm",
+          contents: [
+            {
+              type: "text",
+              text: `${globalIndex}. ${item.name}`,
+              size: isLargeFont ? "md" : "sm",
+              color: "#111827",
+              weight: isLargeFont ? "bold" : "regular",
+              flex: 5,
+              wrap: true,
+            },
+            {
+              type: "text",
+              text: `${item.quantity}`,
+              size: isLargeFont ? "lg" : "sm",
+              color: "#059669",
+              weight: "bold",
+              align: "end",
+              flex: 2,
+              wrap: true,
+            },
+            {
+              type: "text",
+              text: item.unitName || "-",
+              size: isLargeFont ? "md" : "sm",
+              color: "#374151",
+              weight: isLargeFont ? "bold" : "regular",
+              align: "end",
+              flex: 2,
+              wrap: true,
+            },
+          ],
+        });
+      } else {
+        itemRows.push({
+          type: "box",
+          layout: "horizontal",
+          spacing: "sm",
+          margin: "sm",
+          contents: [
+            {
+              type: "text",
+              text: `${globalIndex}. ${item.name}`,
+              size: isLargeFont ? "md" : "sm",
+              color: "#111827",
+              weight: isLargeFont ? "bold" : "regular",
+              flex: 6,
+              wrap: true,
+            },
+            {
+              type: "text",
+              text: `${item.quantity} ${item.unitName}`,
+              size: isLargeFont ? "md" : "sm",
+              color: "#059669",
+              weight: "bold",
+              align: "end",
+              flex: 4,
+              wrap: true,
+            },
+          ],
+        });
+      }
     });
   });
 
@@ -175,7 +221,7 @@ export function createPurchaseOrderFlexBubble(
             text: `🏪 ${storeName}`,
             weight: "bold" as const,
             color: "#ffffff",
-            size: "lg" as const,
+            size: isLargeFont ? ("xl" as const) : ("lg" as const),
             align: "center" as const,
             wrap: true,
           },
@@ -184,7 +230,7 @@ export function createPurchaseOrderFlexBubble(
             text: `📦 ${cleanNote}`,
             weight: "bold" as const,
             color: "#e6fffa",
-            size: "sm" as const,
+            size: isLargeFont ? ("md" as const) : ("sm" as const),
             align: "center" as const,
             margin: "xs" as const,
             wrap: true,
@@ -193,7 +239,7 @@ export function createPurchaseOrderFlexBubble(
             type: "text" as const,
             text: `📅 วันที่: ${dateStr} เวลา ${timeStr} น.`,
             color: "#d1fae5",
-            size: "xs" as const,
+            size: isLargeFont ? ("sm" as const) : ("xs" as const),
             align: "center" as const,
             margin: "xs" as const,
             wrap: true,
@@ -204,31 +250,67 @@ export function createPurchaseOrderFlexBubble(
         type: "box" as const,
         layout: "vertical" as const,
         contents: [
-          {
-            type: "box" as const,
-            layout: "horizontal" as const,
-            contents: [
-              {
-                type: "text" as const,
-                text: "รายการสินค้าที่จะสั่งซื้อ",
-                size: "xs" as const,
-                color: "#6b7280",
-                weight: "bold" as const,
-                flex: 6,
-                wrap: true,
+          separateQuantityUnit
+            ? {
+                type: "box" as const,
+                layout: "horizontal" as const,
+                contents: [
+                  {
+                    type: "text" as const,
+                    text: "รายการสินค้า",
+                    size: isLargeFont ? ("sm" as const) : ("xs" as const),
+                    color: "#4b5563",
+                    weight: "bold" as const,
+                    flex: 5,
+                    wrap: true,
+                  },
+                  {
+                    type: "text" as const,
+                    text: "จำนวน",
+                    size: isLargeFont ? ("sm" as const) : ("xs" as const),
+                    color: "#4b5563",
+                    weight: "bold" as const,
+                    align: "end" as const,
+                    flex: 2,
+                    wrap: true,
+                  },
+                  {
+                    type: "text" as const,
+                    text: "หน่วยนับ",
+                    size: isLargeFont ? ("sm" as const) : ("xs" as const),
+                    color: "#4b5563",
+                    weight: "bold" as const,
+                    align: "end" as const,
+                    flex: 2,
+                    wrap: true,
+                  },
+                ],
+              }
+            : {
+                type: "box" as const,
+                layout: "horizontal" as const,
+                contents: [
+                  {
+                    type: "text" as const,
+                    text: "รายการสินค้าที่จะสั่งซื้อ",
+                    size: isLargeFont ? ("sm" as const) : ("xs" as const),
+                    color: "#6b7280",
+                    weight: "bold" as const,
+                    flex: 6,
+                    wrap: true,
+                  },
+                  {
+                    type: "text" as const,
+                    text: "จำนวน / หน่วยนับ",
+                    size: isLargeFont ? ("sm" as const) : ("xs" as const),
+                    color: "#6b7280",
+                    weight: "bold" as const,
+                    align: "end" as const,
+                    flex: 4,
+                    wrap: true,
+                  },
+                ],
               },
-              {
-                type: "text" as const,
-                text: "จำนวน / หน่วยนับ",
-                size: "xs" as const,
-                color: "#6b7280",
-                weight: "bold" as const,
-                align: "end" as const,
-                flex: 4,
-                wrap: true,
-              },
-            ],
-          },
           {
             type: "separator" as const,
             margin: "sm" as const,
@@ -245,7 +327,7 @@ export function createPurchaseOrderFlexBubble(
                     {
                       type: "text" as const,
                       text: "ไม่มีรายการสินค้า",
-                      size: "sm" as const,
+                      size: isLargeFont ? ("md" as const) : ("sm" as const),
                       color: "#9ca3af",
                       wrap: true,
                     },
@@ -263,7 +345,7 @@ export function createPurchaseOrderFlexBubble(
               {
                 type: "text" as const,
                 text: "รวมจำนวนสินค้าทั้งหมด",
-                size: "sm" as const,
+                size: isLargeFont ? ("md" as const) : ("sm" as const),
                 color: "#374151",
                 flex: 5,
                 wrap: true,
@@ -271,7 +353,7 @@ export function createPurchaseOrderFlexBubble(
               {
                 type: "text" as const,
                 text: `${items.length} รายการ (${totalQuantity} หน่วย)`,
-                size: "sm" as const,
+                size: isLargeFont ? ("md" as const) : ("sm" as const),
                 weight: "bold" as const,
                 color: "#111827",
                 align: "end" as const,
@@ -288,7 +370,7 @@ export function createPurchaseOrderFlexBubble(
               {
                 type: "text" as const,
                 text: "ประมาณการยอดเงินสั่งซื้อ",
-                size: "sm" as const,
+                size: isLargeFont ? ("md" as const) : ("sm" as const),
                 color: "#374151",
                 flex: 5,
                 wrap: true,
@@ -296,7 +378,7 @@ export function createPurchaseOrderFlexBubble(
               {
                 type: "text" as const,
                 text: `฿${totalCost.toLocaleString("th-TH", { minimumFractionDigits: 2 })}`,
-                size: "md" as const,
+                size: isLargeFont ? ("xl" as const) : ("md" as const),
                 weight: "bold" as const,
                 color: "#059669",
                 align: "end" as const,
@@ -318,7 +400,7 @@ export function createPurchaseOrderFlexBubble(
             type: "button" as const,
             style: "primary" as const,
             color: "#06C755",
-            height: "sm" as const,
+            height: isLargeFont ? ("md" as const) : ("sm" as const),
             action: {
               type: "uri" as const,
               label: "📊 เปิดแดชบอร์ดร้าน (หน้าแรก)",
@@ -328,7 +410,7 @@ export function createPurchaseOrderFlexBubble(
           {
             type: "button" as const,
             style: "secondary" as const,
-            height: "sm" as const,
+            height: isLargeFont ? ("md" as const) : ("sm" as const),
             action: {
               type: "uri" as const,
               label: "📋 จัดการใบสั่งซื้อ & ตรวจรับ",

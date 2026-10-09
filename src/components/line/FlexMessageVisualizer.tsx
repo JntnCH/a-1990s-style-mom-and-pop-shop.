@@ -174,7 +174,7 @@ export function FlexMessageVisualizer({
             </div>
 
             {/* Bubble Card */}
-            <div className="w-full max-w-[360px] sm:max-w-[400px] rounded-2xl overflow-hidden shadow-lg bg-white text-zinc-900 border border-black/10">
+            <div className="w-full max-w-[390px] sm:max-w-[450px] rounded-2xl overflow-hidden shadow-lg bg-white text-zinc-900 border border-black/10">
               {/* Header Box */}
               {bubble?.header && (
                 <div
@@ -235,13 +235,16 @@ function RenderFlexComponent({
     case "text": {
       const isBold = component.weight === "bold";
       const sizeClasses: Record<string, string> = {
-        xxs: "text-[10px]",
+        xxs: "text-[11px]",
         xs: "text-xs",
-        sm: "text-[13px]",
-        md: "text-sm",
-        lg: "text-base",
-        xl: "text-lg font-bold",
-        xxl: "text-xl font-bold",
+        sm: "text-sm",
+        md: "text-base",
+        lg: "text-lg",
+        xl: "text-xl font-bold",
+        xxl: "text-2xl font-bold",
+        "3xl": "text-3xl font-bold",
+        "4xl": "text-4xl font-bold",
+        "5xl": "text-5xl font-bold",
       };
       const alignClasses: Record<string, string> = {
         start: "text-left",
@@ -253,12 +256,13 @@ function RenderFlexComponent({
 
       return (
         <div
-          className={`${sizeClasses[component.size || "md"] || "text-sm"} ${
+          className={`${sizeClasses[component.size || "md"] || "text-base"} ${
             alignClasses[component.align || "start"] || "text-left"
-          } ${isBold ? "font-bold" : "font-normal"} ${component.wrap ? "break-words" : "truncate"}`}
+          } ${isBold ? "font-bold" : "font-normal"} ${component.wrap ? "break-words" : "truncate"} min-w-0`}
           style={{
             color,
-            flex: component.flex !== undefined ? component.flex : undefined,
+            flex:
+              component.flex !== undefined ? `${component.flex} ${component.flex} 0%` : undefined,
           }}
         >
           {component.text}
@@ -284,6 +288,7 @@ function RenderFlexComponent({
     case "box": {
       const isHorizontal = component.layout === "horizontal";
       const spacingMap: Record<string, string> = {
+        none: "",
         xs: isHorizontal ? "gap-1" : "space-y-1",
         sm: isHorizontal ? "gap-2" : "space-y-1.5",
         md: isHorizontal ? "gap-3" : "space-y-2",
@@ -292,6 +297,7 @@ function RenderFlexComponent({
       };
 
       const marginMap: Record<string, string> = {
+        none: "",
         xs: "mt-1",
         sm: "mt-1.5",
         md: "mt-2",
@@ -301,13 +307,15 @@ function RenderFlexComponent({
 
       return (
         <div
-          className={`w-full ${isHorizontal ? "flex items-center justify-between" : "flex flex-col"} ${
+          className={`w-full ${isHorizontal ? "flex items-center" : "flex flex-col"} ${
             spacingMap[component.spacing || "none"] || ""
           } ${marginMap[component.margin || "none"] || ""}`}
           style={{
             backgroundColor: component.backgroundColor || undefined,
             padding: component.paddingAll ? "12px" : undefined,
-            flex: component.flex !== undefined ? component.flex : undefined,
+            flex:
+              component.flex !== undefined ? `${component.flex} ${component.flex} 0%` : undefined,
+            minWidth: 0,
           }}
         >
           {component.contents?.map((child, idx) => (
@@ -323,7 +331,7 @@ function RenderFlexComponent({
       return (
         <button
           type="button"
-          className={`w-full py-2.5 px-4 rounded-xl text-xs font-bold transition-all ${
+          className={`w-full ${component.height === "sm" ? "py-2 text-xs" : "py-2.5 text-sm"} px-4 rounded-xl font-bold transition-all ${
             isPrimary ? "text-white shadow-xs" : "border border-zinc-200 bg-white text-zinc-800"
           }`}
           style={{ backgroundColor: btnColor }}

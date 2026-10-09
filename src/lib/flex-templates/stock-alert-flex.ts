@@ -29,12 +29,17 @@ export interface StockAlertFlexOptions {
   themeColor?: string;
   groupBy?: FlexItemGroupBy;
   showGroupHeaders?: boolean;
+  fontSize?: "large" | "medium";
+  separateQuantityUnit?: boolean;
 }
 
 export function createStockAlertFlexBubble(
   items: FlexStockAlertItem[],
   options: StockAlertFlexOptions = {},
 ) {
+  const isLargeFont = options.fontSize !== "medium";
+  const separateQuantityUnit = options.separateQuantityUnit !== false;
+
   const now = new Date();
   const dateStr = now.toLocaleDateString("th-TH", {
     year: "numeric",
@@ -72,7 +77,7 @@ export function createStockAlertFlexBubble(
           {
             type: "text",
             text: grp.headerTitle,
-            size: "xs",
+            size: isLargeFont ? "sm" : "xs",
             color: "#991b1b",
             weight: "bold",
             wrap: true,
@@ -81,7 +86,7 @@ export function createStockAlertFlexBubble(
           {
             type: "text",
             text: `${grp.items.length} รายการ`,
-            size: "xxs",
+            size: isLargeFont ? "xs" : "xxs",
             color: "#dc2626",
             align: "end",
             weight: "bold",
@@ -94,32 +99,72 @@ export function createStockAlertFlexBubble(
     grp.items.forEach(({ item }) => {
       globalIndex++;
       const isOut = item.status === "OUT_OF_STOCK" || item.stock <= 0;
-      itemRows.push({
-        type: "box",
-        layout: "horizontal",
-        spacing: "sm",
-        margin: "xs",
-        contents: [
-          {
-            type: "text",
-            text: `${globalIndex}. ${item.name}`,
-            size: "sm",
-            color: "#1f2937",
-            flex: 6,
-            wrap: true,
-          },
-          {
-            type: "text",
-            text: isOut ? "สินค้าหมด (0)" : `เหลือ ${item.stock} ${item.unitName}`,
-            size: "sm",
-            color: isOut ? "#dc2626" : "#d97706",
-            weight: "bold",
-            align: "end",
-            flex: 4,
-            wrap: true,
-          },
-        ],
-      });
+      if (separateQuantityUnit) {
+        itemRows.push({
+          type: "box",
+          layout: "horizontal",
+          spacing: "sm",
+          margin: "sm",
+          contents: [
+            {
+              type: "text",
+              text: `${globalIndex}. ${item.name}`,
+              size: isLargeFont ? "md" : "sm",
+              color: "#1f2937",
+              weight: isLargeFont ? "bold" : "regular",
+              flex: 5,
+              wrap: true,
+            },
+            {
+              type: "text",
+              text: isOut ? "0" : `${item.stock}`,
+              size: isLargeFont ? "lg" : "sm",
+              color: isOut ? "#dc2626" : "#d97706",
+              weight: "bold",
+              align: "end",
+              flex: 2,
+              wrap: true,
+            },
+            {
+              type: "text",
+              text: item.unitName || "-",
+              size: isLargeFont ? "md" : "sm",
+              color: "#4b5563",
+              weight: isLargeFont ? "bold" : "regular",
+              align: "end",
+              flex: 2,
+              wrap: true,
+            },
+          ],
+        });
+      } else {
+        itemRows.push({
+          type: "box",
+          layout: "horizontal",
+          spacing: "sm",
+          margin: "xs",
+          contents: [
+            {
+              type: "text",
+              text: `${globalIndex}. ${item.name}`,
+              size: isLargeFont ? "md" : "sm",
+              color: "#1f2937",
+              flex: 6,
+              wrap: true,
+            },
+            {
+              type: "text",
+              text: isOut ? "สินค้าหมด (0)" : `เหลือ ${item.stock} ${item.unitName}`,
+              size: isLargeFont ? "md" : "sm",
+              color: isOut ? "#dc2626" : "#d97706",
+              weight: "bold",
+              align: "end",
+              flex: 4,
+              wrap: true,
+            },
+          ],
+        });
+      }
     });
   });
 
@@ -140,7 +185,7 @@ export function createStockAlertFlexBubble(
             text: `🏪 ${storeName}`,
             weight: "bold" as const,
             color: "#ffffff",
-            size: "lg" as const,
+            size: isLargeFont ? ("xl" as const) : ("lg" as const),
             align: "center" as const,
             wrap: true,
           },
@@ -149,7 +194,7 @@ export function createStockAlertFlexBubble(
             text: `⚠️ ${title}`,
             weight: "bold" as const,
             color: "#fee2e2",
-            size: "sm" as const,
+            size: isLargeFont ? ("md" as const) : ("sm" as const),
             align: "center" as const,
             margin: "xs" as const,
             wrap: true,
@@ -158,7 +203,7 @@ export function createStockAlertFlexBubble(
             type: "text" as const,
             text: `📅 วันที่: ${dateStr} เวลา ${timeStr} น.`,
             color: "#fecaca",
-            size: "xs" as const,
+            size: isLargeFont ? ("sm" as const) : ("xs" as const),
             align: "center" as const,
             margin: "xs" as const,
             wrap: true,
@@ -169,29 +214,62 @@ export function createStockAlertFlexBubble(
         type: "box" as const,
         layout: "vertical" as const,
         contents: [
-          {
-            type: "box" as const,
-            layout: "horizontal" as const,
-            contents: [
-              {
-                type: "text" as const,
-                text: "สินค้าที่ต้องตรวจสอบ",
-                size: "xs" as const,
-                color: "#6b7280",
-                weight: "bold" as const,
-                flex: 6,
+          separateQuantityUnit
+            ? {
+                type: "box" as const,
+                layout: "horizontal" as const,
+                contents: [
+                  {
+                    type: "text" as const,
+                    text: "รายการสินค้า",
+                    size: isLargeFont ? ("sm" as const) : ("xs" as const),
+                    color: "#4b5563",
+                    weight: "bold" as const,
+                    flex: 5,
+                  },
+                  {
+                    type: "text" as const,
+                    text: "คงเหลือ",
+                    size: isLargeFont ? ("sm" as const) : ("xs" as const),
+                    color: "#4b5563",
+                    weight: "bold" as const,
+                    align: "end" as const,
+                    flex: 2,
+                  },
+                  {
+                    type: "text" as const,
+                    text: "หน่วยนับ",
+                    size: isLargeFont ? ("sm" as const) : ("xs" as const),
+                    color: "#4b5563",
+                    weight: "bold" as const,
+                    align: "end" as const,
+                    flex: 2,
+                  },
+                ],
+              }
+            : {
+                type: "box" as const,
+                layout: "horizontal" as const,
+                contents: [
+                  {
+                    type: "text" as const,
+                    text: "สินค้าที่ต้องตรวจสอบ",
+                    size: isLargeFont ? ("sm" as const) : ("xs" as const),
+                    color: "#6b7280",
+                    weight: "bold" as const,
+                    flex: 6,
+                  },
+                  {
+                    type: "text" as const,
+                    text: "สถานะคงเหลือ",
+                    size: isLargeFont ? ("sm" as const) : ("xs" as const),
+                    color: "#6b7280",
+                    weight: "bold" as const,
+                    align: "end" as const,
+                    flex: 4,
+                  },
+                ],
               },
-              {
-                type: "text" as const,
-                text: "สถานะคงเหลือ",
-                size: "xs" as const,
-                color: "#6b7280",
-                weight: "bold" as const,
-                align: "end" as const,
-                flex: 4,
-              },
-            ],
-          },
           {
             type: "separator" as const,
             margin: "sm" as const,
@@ -208,7 +286,7 @@ export function createStockAlertFlexBubble(
                     {
                       type: "text" as const,
                       text: "สินค้าทุกรายการมีสต็อกเพียงพอ",
-                      size: "sm" as const,
+                      size: isLargeFont ? ("md" as const) : ("sm" as const),
                       color: "#10b981",
                       weight: "bold" as const,
                     },
@@ -226,13 +304,13 @@ export function createStockAlertFlexBubble(
               {
                 type: "text" as const,
                 text: "รวมสินค้าที่ต้องเติมสต็อก",
-                size: "sm" as const,
+                size: isLargeFont ? ("md" as const) : ("sm" as const),
                 color: "#374151",
               },
               {
                 type: "text" as const,
                 text: `${items.length} รายการ`,
-                size: "sm" as const,
+                size: isLargeFont ? ("md" as const) : ("sm" as const),
                 weight: "bold" as const,
                 color: "#dc2626",
                 align: "end" as const,

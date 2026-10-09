@@ -480,13 +480,6 @@ function ReorderPage() {
   };
 
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      try {
-        localStorage.removeItem("minimark_custom_po_flex_json");
-      } catch {
-        // ignore
-      }
-    }
     reloadData();
     getLineStatus()
       .then(setLineStatus)

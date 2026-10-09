@@ -926,7 +926,8 @@ function SettingsPage() {
                   <div>
                     <h4 className="font-bold text-sm text-foreground">ใบสั่งซื้อสินค้าประจำวัน</h4>
                     <p className="text-xs text-muted-foreground mt-1">
-                      ชื่อร้านขึ้นก่อน ไม่ซ้ำวันที่ และทุกตัวอักษรไม่หลุดบล็อก
+                      แยกคอลัมน์ [รายการ] [จำนวน] [หน่วยนับ] ออกจากกันชัดเจน พร้อมข้อความขนาดใหญ่
+                      อ่านง่ายสบายตา
                     </p>
                   </div>
                   <Button

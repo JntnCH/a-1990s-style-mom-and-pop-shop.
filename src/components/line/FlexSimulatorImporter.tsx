@@ -41,23 +41,40 @@ const STORAGE_KEY = "minimark_custom_po_flex_json";
 
 export function FlexSimulatorImporter({ onSaved }: FlexSimulatorImporterProps) {
   const currentStoreName = getSystemStoreName();
-  const defaultPOFlex = createPurchaseOrderFlexBubble(
-    [
+
+  const [isSeparateQtyUnit, setIsSeparateQtyUnit] = useState<boolean>(true);
+  const [isLargeFont, setIsLargeFont] = useState<boolean>(true);
+
+  const getCustomPOFlex = (separate = isSeparateQtyUnit, large = isLargeFont) =>
+    createPurchaseOrderFlexBubble(
+      [
+        {
+          name: "ปลาร้า แม่เหรียญ ฝาขาว 380 มล.",
+          quantity: 1,
+          unitName: "แพ็ค",
+          costPrice: 180,
+        },
+        {
+          name: "ครีมเภสัช 45 ก.",
+          quantity: 15,
+          unitName: "ขวด",
+          costPrice: 25,
+        },
+        {
+          name: "น้ำปลาทิพรส 700 มล.",
+          quantity: 6,
+          unitName: "ขวด",
+          costPrice: 32,
+        },
+      ],
       {
-        name: "ปลาร้า แม่เหรียญ ฝาขาว 380 มล.",
-        quantity: 1,
-        unitName: "แพ็ค",
-        costPrice: 180,
+        storeName: currentStoreName,
+        fontSize: large ? "large" : "medium",
+        separateQuantityUnit: separate,
       },
-      {
-        name: "ครีมเภสัช 45 ก.",
-        quantity: 15,
-        unitName: "ขวด",
-        costPrice: 25,
-      },
-    ],
-    { storeName: currentStoreName },
-  );
+    );
+
+  const defaultPOFlex = getCustomPOFlex(true, true);
 
   const [rawJson, setRawJson] = useState<string>("");
   const [parsedFlex, setParsedFlex] = useState<unknown>(defaultPOFlex);
@@ -145,10 +162,13 @@ export function FlexSimulatorImporter({ onSaved }: FlexSimulatorImporterProps) {
     if (confirm("ต้องการคืนค่าเป็นแม่แบบมาตรฐานของระบบใช่หรือไม่?")) {
       localStorage.removeItem(STORAGE_KEY);
       setIsCustomSaved(false);
-      setRawJson(JSON.stringify(defaultPOFlex, null, 2));
-      setParsedFlex(defaultPOFlex);
+      const freshPO = getCustomPOFlex(true, true);
+      setRawJson(JSON.stringify(freshPO, null, 2));
+      setParsedFlex(freshPO);
+      setIsSeparateQtyUnit(true);
+      setIsLargeFont(true);
       setParseError(null);
-      toast.success("คืนค่าแม่แบบมาตรฐานเรียบร้อยแล้ว");
+      toast.success("คืนค่าแม่แบบมาตรฐาน (แยกจำนวน/หน่วยนับ - ตัวหนังสือใหญ่) เรียบร้อยแล้ว");
       window.dispatchEvent(new CustomEvent("minimark_store_change"));
       if (onSaved) onSaved();
     }
@@ -158,16 +178,28 @@ export function FlexSimulatorImporter({ onSaved }: FlexSimulatorImporterProps) {
     if (typeof navigator !== "undefined" && navigator.clipboard) {
       navigator.clipboard.writeText(rawJson);
       setCopied(true);
-      toast.success("คัดลอก JSON สำเร็จ");
-      setTimeout(() => setCopied(false), 2000);
+      toast.success("คัดลอก JSON สำเร็จ นำไปวางที่ LINE Flex Message Simulator ได้ทันที");
+      setTimeout(() => setCopied(false), 2500);
     }
+  };
+
+  const handleApplyLayoutConfig = (newSeparate: boolean, newLarge: boolean) => {
+    setIsSeparateQtyUnit(newSeparate);
+    setIsLargeFont(newLarge);
+    const newPO = getCustomPOFlex(newSeparate, newLarge);
+    setRawJson(JSON.stringify(newPO, null, 2));
+    setParsedFlex(newPO);
+    setParseError(null);
+    toast.success(
+      `ปรับเลย์เอาต์เป็น: ${newSeparate ? "แยกคอลัมน์ จำนวน/หน่วยนับ (3 คอลัมน์)" : "รวมจำนวน+หน่วยนับ (2 คอลัมน์)"} + ${newLarge ? "ตัวอักษรขนาดใหญ่" : "ตัวอักษรขนาดปกติ"} เรียบร้อย`,
+    );
   };
 
   const handleLoadPreset = (presetName: string) => {
     let presetObj: unknown;
     switch (presetName) {
       case "PO":
-        presetObj = defaultPOFlex;
+        presetObj = getCustomPOFlex(isSeparateQtyUnit, isLargeFont);
         break;
       case "ALERT":
         presetObj = createStockAlertFlexBubble(
@@ -186,8 +218,19 @@ export function FlexSimulatorImporter({ onSaved }: FlexSimulatorImporterProps) {
               unitName: "ขวด",
               status: "LOW_STOCK",
             },
+            {
+              name: "น้ำปลาทิพรส 700 มล.",
+              stock: 1,
+              minStock: 8,
+              unitName: "ขวด",
+              status: "LOW_STOCK",
+            },
           ],
-          { storeName: currentStoreName },
+          {
+            storeName: currentStoreName,
+            fontSize: isLargeFont ? "large" : "medium",
+            separateQuantityUnit: isSeparateQtyUnit,
+          },
         );
         break;
       case "PORTAL":
@@ -258,21 +301,26 @@ export function FlexSimulatorImporter({ onSaved }: FlexSimulatorImporterProps) {
               </h3>
             </div>
             <p className="text-xs text-muted-foreground leading-relaxed">
-              ออกแบบการ์ดตามใจคุณบน{" "}
-              <a
-                href="https://developers.line.biz/flex-simulator/"
-                target="_blank"
-                rel="noreferrer"
-                className="font-bold text-primary underline inline-flex items-center gap-0.5"
-              >
-                LINE Flex Message Simulator <ExternalLink className="size-3" />
-              </a>{" "}
-              แล้วคัดลอก JSON มาวางในกล่องด้านล่าง
-              ระบบจะแสดงตัวอย่างสดและบันทึกเป็นแม่แบบใช้งานจริงทันที
+              แม่แบบใหม่: แยกคอลัมน์ <strong>[รายการสินค้า] [จำนวน] [หน่วยนับ]</strong>{" "}
+              ออกจากกันอย่างชัดเจน พร้อมปรับตัวหนังสือขนาดใหญ่พิเศษ (Size: md, lg, xl)
+              อ่านง่ายสบายตาบนมือถือ
             </p>
           </div>
 
           <div className="flex items-center gap-2 flex-wrap">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleCopyJson}
+              className="h-9 text-xs rounded-xl gap-1.5 font-semibold text-emerald-700 dark:text-emerald-300 border-emerald-500/40"
+            >
+              {copied ? (
+                <Check className="size-3.5 text-emerald-600" />
+              ) : (
+                <Copy className="size-3.5" />
+              )}
+              คัดลอก JSON ไปวางที่ LINE Simulator
+            </Button>
             <Button
               asChild
               variant="outline"
@@ -312,16 +360,44 @@ export function FlexSimulatorImporter({ onSaved }: FlexSimulatorImporterProps) {
         </Alert>
       ) : null}
 
-      {/* Preset Quick Loader */}
-      <div className="flex items-center justify-between gap-2 flex-wrap bg-muted/40 p-2.5 rounded-xl border border-border/60">
-        <div className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground">
-          <Layers className="size-4 text-primary" /> โหลดโครงสร้างตัวอย่าง:
+      {/* Quick Layout & Font Customizer Control Bar */}
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-muted/50 p-3 rounded-2xl border border-border/70">
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-xs font-bold text-foreground flex items-center gap-1.5">
+            <Sparkles className="size-3.5 text-primary" /> ปรับแต่งเลย์เอาต์ด่วน:
+          </span>
+
+          <Button
+            size="sm"
+            variant={isSeparateQtyUnit ? "default" : "outline"}
+            className={`h-7 text-xs rounded-lg px-2.5 gap-1 ${
+              isSeparateQtyUnit ? "bg-emerald-600 hover:bg-emerald-700 text-white" : ""
+            }`}
+            onClick={() => handleApplyLayoutConfig(!isSeparateQtyUnit, isLargeFont)}
+          >
+            {isSeparateQtyUnit
+              ? "✓ แยก 3 คอลัมน์ (จำนวน / หน่วยนับ)"
+              : "รวม 2 คอลัมน์ (จำนวน+หน่วย)"}
+          </Button>
+
+          <Button
+            size="sm"
+            variant={isLargeFont ? "default" : "outline"}
+            className={`h-7 text-xs rounded-lg px-2.5 gap-1 ${
+              isLargeFont ? "bg-emerald-600 hover:bg-emerald-700 text-white" : ""
+            }`}
+            onClick={() => handleApplyLayoutConfig(isSeparateQtyUnit, !isLargeFont)}
+          >
+            {isLargeFont ? "✓ ฟอนต์ใหญ่ (Large Font)" : "ฟอนต์ปกติ (Regular)"}
+          </Button>
         </div>
+
         <div className="flex items-center gap-1.5 flex-wrap">
+          <div className="text-[11px] font-semibold text-muted-foreground mr-1">โหลดแม่แบบ:</div>
           <Button
             size="sm"
             variant="outline"
-            className="h-7 text-xs rounded-lg px-2.5"
+            className="h-7 text-xs rounded-lg px-2.5 font-medium"
             onClick={() => handleLoadPreset("PO")}
           >
             📦 ใบสั่งซื้อ (PO)
@@ -329,7 +405,7 @@ export function FlexSimulatorImporter({ onSaved }: FlexSimulatorImporterProps) {
           <Button
             size="sm"
             variant="outline"
-            className="h-7 text-xs rounded-lg px-2.5"
+            className="h-7 text-xs rounded-lg px-2.5 font-medium"
             onClick={() => handleLoadPreset("ALERT")}
           >
             ⚠️ เตือนสต็อก
@@ -337,7 +413,7 @@ export function FlexSimulatorImporter({ onSaved }: FlexSimulatorImporterProps) {
           <Button
             size="sm"
             variant="outline"
-            className="h-7 text-xs rounded-lg px-2.5"
+            className="h-7 text-xs rounded-lg px-2.5 font-medium"
             onClick={() => handleLoadPreset("PORTAL")}
           >
             🏪 ทางเข้า Mini App
@@ -345,12 +421,36 @@ export function FlexSimulatorImporter({ onSaved }: FlexSimulatorImporterProps) {
           <Button
             size="sm"
             variant="outline"
-            className="h-7 text-xs rounded-lg px-2.5"
+            className="h-7 text-xs rounded-lg px-2.5 font-medium"
             onClick={() => handleLoadPreset("SUMMARY")}
           >
-            📊 สรุปยอดสต็อก
+            📊 สรุปยอด
           </Button>
         </div>
+      </div>
+
+      {/* 3 Steps Guide for LINE Simulator */}
+      <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-3 text-xs text-amber-950 dark:text-amber-200 space-y-1">
+        <p className="font-bold flex items-center gap-1.5">
+          💡 วิธีใช้งานร่วมกับ LINE Flex Message Simulator:
+        </p>
+        <ol className="list-decimal list-inside space-y-0.5 text-[11px] text-amber-900/90 dark:text-amber-200/90">
+          <li>
+            กดปุ่ม <strong>&quot;คัดลอก JSON&quot;</strong> จากช่องด้านซ้าย
+          </li>
+          <li>
+            เปิดเว็บ <strong>LINE Flex Message Simulator</strong> แล้วคลิกปุ่ม{" "}
+            <strong>&lt;Show JSON&gt;</strong> ที่แถบขวาบน
+          </li>
+          <li>
+            ลบโค้ดเดิมใน Simulator แล้ววาง JSON ที่คัดลอกไป จากนั้นกด <strong>Apply</strong>{" "}
+            เพื่อดูหรือปรับแต่งเพิ่มเติม
+          </li>
+          <li>
+            เมื่อปรับแต่งเสร็จ คัดลอก JSON จาก Simulator กลับมาวางในกล่องด้านซ้ายนี้แล้วกด{" "}
+            <strong>&quot;บันทึกเป็นแม่แบบใช้งาน&quot;</strong>
+          </li>
+        </ol>
       </div>
 
       {/* Editor & Live Preview Grid */}
@@ -375,7 +475,7 @@ export function FlexSimulatorImporter({ onSaved }: FlexSimulatorImporterProps) {
                 <Button
                   size="sm"
                   variant="ghost"
-                  className="h-7 text-xs px-2 gap-1"
+                  className="h-7 text-xs px-2 gap-1 font-semibold text-emerald-700 dark:text-emerald-300"
                   onClick={handleCopyJson}
                 >
                   {copied ? (
@@ -383,7 +483,7 @@ export function FlexSimulatorImporter({ onSaved }: FlexSimulatorImporterProps) {
                   ) : (
                     <Copy className="size-3" />
                   )}
-                  คัดลอก
+                  {copied ? "คัดลอกแล้ว!" : "คัดลอก JSON"}
                 </Button>
               </div>
             </div>
@@ -444,9 +544,17 @@ export function FlexSimulatorImporter({ onSaved }: FlexSimulatorImporterProps) {
               <MessageCircle className="size-4 text-[#06C755]" /> ตัวอย่างผลลัพธ์ในแอป LINE (Live
               Preview)
             </span>
-            <Badge variant="outline" className="text-[10px]">
-              อัปเดตแบบเรียลไทม์
-            </Badge>
+            <div className="flex items-center gap-1.5">
+              <Badge
+                variant="outline"
+                className="text-[10px] text-emerald-700 dark:text-emerald-300 border-emerald-500/30"
+              >
+                แยกจำนวน/หน่วยนับ • ฟอนต์ใหญ่
+              </Badge>
+              <Badge variant="outline" className="text-[10px]">
+                อัปเดตสด
+              </Badge>
+            </div>
           </div>
 
           <FlexMessageVisualizer
