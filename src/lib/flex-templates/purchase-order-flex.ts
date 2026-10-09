@@ -153,7 +153,6 @@ export function createPurchaseOrderFlexBubble(
     });
   });
 
-
   return {
     type: "flex" as const,
     altText: `📦 ${storeName} — ${cleanNote} (${items.length} รายการ, รวม ${totalQuantity} หน่วย)`,

@@ -727,14 +727,16 @@ function PosAndIssuePage() {
                                   <Input
                                     type="number"
                                     step="0.5"
+                                    placeholder="0.00"
                                     className="h-7 w-20 text-right font-mono text-xs rounded-md inline-block"
-                                    value={item.unitPrice}
-                                    onChange={(e) =>
+                                    value={item.unitPrice === 0 ? "" : item.unitPrice}
+                                    onChange={(e) => {
+                                      const val = e.target.value;
                                       handleUpdateUnitPrice(
                                         item.productId,
-                                        Number(e.target.value) || 0,
-                                      )
-                                    }
+                                        val === "" ? 0 : Number(val),
+                                      );
+                                    }}
                                   />
                                 </TableCell>
 
@@ -746,13 +748,16 @@ function PosAndIssuePage() {
                                     step="0.5"
                                     placeholder="0"
                                     className="h-7 w-18 text-right font-mono text-xs rounded-md inline-block"
-                                    value={item.discountAmount || ""}
-                                    onChange={(e) =>
+                                    value={
+                                      item.discountAmount === 0 ? "" : item.discountAmount || ""
+                                    }
+                                    onChange={(e) => {
+                                      const val = e.target.value;
                                       handleUpdateItemDiscount(
                                         item.productId,
-                                        Number(e.target.value) || 0,
-                                      )
-                                    }
+                                        val === "" ? 0 : Number(val),
+                                      );
+                                    }}
                                   />
                                 </TableCell>
 
@@ -789,8 +794,11 @@ function PosAndIssuePage() {
                           type="number"
                           min="0"
                           step="1"
-                          value={overallDiscount || ""}
-                          onChange={(e) => setOverallDiscount(Number(e.target.value) || 0)}
+                          value={overallDiscount === 0 ? "" : overallDiscount}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setOverallDiscount(val === "" ? 0 : Number(val));
+                          }}
                           placeholder="0.00"
                           className="h-9 rounded-xl font-mono text-xs"
                         />
@@ -971,9 +979,13 @@ function PosAndIssuePage() {
                             <Input
                               type="number"
                               min="0"
+                              placeholder="0.00"
                               className="h-8 w-28 text-right font-mono font-bold text-sm rounded-lg"
-                              value={cashReceived}
-                              onChange={(e) => setCashReceived(Number(e.target.value) || 0)}
+                              value={cashReceived === 0 ? "" : cashReceived}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                setCashReceived(val === "" ? 0 : Number(val));
+                              }}
                             />
                           </div>
 

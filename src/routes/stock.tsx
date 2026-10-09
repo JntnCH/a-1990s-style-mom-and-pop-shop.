@@ -91,7 +91,7 @@ function StockPage() {
   // Stock Adjustment Modal
   const [adjustModalOpen, setAdjustModalOpen] = useState(false);
   const [adjustingProduct, setAdjustingProduct] = useState<ProductItem | null>(null);
-  const [adjustNewStock, setAdjustNewStock] = useState<number>(0);
+  const [adjustNewStock, setAdjustNewStock] = useState<string>("0");
   const [adjustOperator, setAdjustOperator] = useState("ผู้ดูแลระบบ");
   const [adjustReason, setAdjustReason] = useState("ตรวจนับสต็อกประจำงวด");
   const [adjustSuccessMsg, setAdjustSuccessMsg] = useState("");
@@ -146,7 +146,7 @@ function StockPage() {
 
   const handleOpenAdjust = (product: ProductItem) => {
     setAdjustingProduct(product);
-    setAdjustNewStock(product.stock);
+    setAdjustNewStock(String(product.stock));
     setAdjustOperator("ผู้จัดการร้าน / ผู้ดูแลระบบ");
     setAdjustReason("ตรวจนับสต็อกจริงหน้าร้าน");
     setAdjustModalOpen(true);
@@ -155,16 +155,19 @@ function StockPage() {
   const handleSaveAdjustment = () => {
     if (!adjustingProduct) return;
 
+    const parsedStock = adjustNewStock.trim() === "" ? 0 : Number(adjustNewStock);
+    const validStock = isNaN(parsedStock) ? 0 : Math.max(0, parsedStock);
+
     const res = MasterStore.adjustStock(
       adjustingProduct.id,
-      Number(adjustNewStock),
+      validStock,
       adjustOperator.trim() || "ผู้ดูแลระบบ",
       adjustReason.trim() || "ปรับยอดสต็อก",
     );
 
     if (res.success) {
       setAdjustSuccessMsg(
-        `ปรับปรุงยอด "${adjustingProduct.name}" จากเดิม ${adjustingProduct.stock} เป็น ${adjustNewStock} สำเร็จ (บันทึกประวัติ Movement เรียบร้อยแล้ว)`,
+        `ปรับปรุงยอด "${adjustingProduct.name}" จากเดิม ${adjustingProduct.stock} เป็น ${validStock} สำเร็จ (บันทึกประวัติ Movement เรียบร้อยแล้ว)`,
       );
       setAdjustModalOpen(false);
       setAdjustingProduct(null);
@@ -525,24 +528,33 @@ function StockPage() {
               <Input
                 type="number"
                 min="0"
+                placeholder="0"
                 className="h-10 font-mono text-base font-bold rounded-xl"
                 value={adjustNewStock}
-                onChange={(e) => setAdjustNewStock(Math.max(0, Number(e.target.value)))}
+                onChange={(e) => setAdjustNewStock(e.target.value)}
               />
               {adjustingProduct && (
                 <p className="text-[11px] text-muted-foreground">
                   ผลต่างสต็อก:{" "}
                   <span
                     className={`font-bold font-mono ${
-                      adjustNewStock - adjustingProduct.stock > 0
+                      (adjustNewStock === "" ? 0 : Number(adjustNewStock)) -
+                        adjustingProduct.stock >
+                      0
                         ? "text-emerald-600"
-                        : adjustNewStock - adjustingProduct.stock < 0
+                        : (adjustNewStock === "" ? 0 : Number(adjustNewStock)) -
+                              adjustingProduct.stock <
+                            0
                           ? "text-destructive"
                           : "text-muted-foreground"
                     }`}
                   >
-                    {adjustNewStock - adjustingProduct.stock > 0 ? "+" : ""}
-                    {adjustNewStock - adjustingProduct.stock} {getUnitName(adjustingProduct.unitId)}
+                    {(adjustNewStock === "" ? 0 : Number(adjustNewStock)) - adjustingProduct.stock >
+                    0
+                      ? "+"
+                      : ""}
+                    {(adjustNewStock === "" ? 0 : Number(adjustNewStock)) - adjustingProduct.stock}{" "}
+                    {getUnitName(adjustingProduct.unitId)}
                   </span>
                 </p>
               )}

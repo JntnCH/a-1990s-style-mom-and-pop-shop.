@@ -325,9 +325,9 @@ function ReorderPage() {
   const [quickCatId, setQuickCatId] = useState("");
   const [quickZoneId, setQuickZoneId] = useState("");
   const [quickUnitId, setQuickUnitId] = useState("");
-  const [quickCostPrice, setQuickCostPrice] = useState<number>(0);
-  const [quickSellPrice, setQuickSellPrice] = useState<number>(0);
-  const [quickOrderQty, setQuickOrderQty] = useState<number>(10);
+  const [quickCostPrice, setQuickCostPrice] = useState<string>("");
+  const [quickSellPrice, setQuickSellPrice] = useState<string>("");
+  const [quickOrderQty, setQuickOrderQty] = useState<string>("1");
   const [quickFormError, setQuickFormError] = useState("");
   const [hasRestoredDraft, setHasRestoredDraft] = useState(false);
 
@@ -437,17 +437,17 @@ function ReorderPage() {
       categoryId: finalCat,
       zoneId: quickZoneId || undefined,
       unitId: finalUnit,
-      costPrice: Number(quickCostPrice) || 0,
-      sellPrice: Number(quickSellPrice) || 0,
+      costPrice: quickCostPrice.trim() === "" ? 0 : Number(quickCostPrice) || 0,
+      sellPrice: quickSellPrice.trim() === "" ? 0 : Number(quickSellPrice) || 0,
       stock: 0,
       minStock: 5,
       targetStock: 15,
-      reorderQuantity: Number(quickOrderQty) || 10,
+      reorderQuantity: quickOrderQty.trim() === "" ? 1 : Number(quickOrderQty) || 1,
       isActive: true,
     });
 
     // Immediately add to current order list
-    const qty = Math.max(1, Number(quickOrderQty) || 10);
+    const qty = Math.max(1, quickOrderQty.trim() === "" ? 1 : Number(quickOrderQty) || 1);
     setOrderList((prev) => [
       {
         productId: newProd.id,
@@ -469,9 +469,9 @@ function ReorderPage() {
     setQuickName("");
     setQuickBarcode("");
     setQuickSku("");
-    setQuickCostPrice(0);
-    setQuickSellPrice(0);
-    setQuickOrderQty(10);
+    setQuickCostPrice("");
+    setQuickSellPrice("");
+    setQuickOrderQty("1");
     setQuickFormError("");
 
     toast.success(
@@ -1503,7 +1503,12 @@ function ReorderPage() {
         const flexMsg = formatDailyOrderFlexMessage(fullItems, orderDateStr, currentStoreName, {
           groupBy: flexGroupBy,
         });
-        const plainText = formatOrderPlainText(fullItems, orderDateStr, currentStoreName, flexGroupBy);
+        const plainText = formatOrderPlainText(
+          fullItems,
+          orderDateStr,
+          currentStoreName,
+          flexGroupBy,
+        );
 
         if (tokenToUse || serverConfig?.hasAccessToken) {
           const res = await sendWith3TierFallback({
@@ -2580,7 +2585,9 @@ function ReorderPage() {
                         <option value="zone_then_category">
                           📍 โซน ➔ 🏷️ หมวดหมู่ (แนะนำ: จัดวางใกล้กัน)
                         </option>
-                        <option value="category">🏷️ ตามหมวดหมู่สินค้า (เช่น เครื่องดื่ม, ของแห้ง)</option>
+                        <option value="category">
+                          🏷️ ตามหมวดหมู่สินค้า (เช่น เครื่องดื่ม, ของแห้ง)
+                        </option>
                         <option value="zone">
                           📍 ตามโซนจัดวางสินค้า (เช่น โซน A หน้าร้าน, โซน C ตู้แช่)
                         </option>
@@ -4896,8 +4903,9 @@ function ReorderPage() {
                   type="number"
                   min="0"
                   step="0.5"
+                  placeholder="0.00"
                   value={quickCostPrice}
-                  onChange={(e) => setQuickCostPrice(Number(e.target.value) || 0)}
+                  onChange={(e) => setQuickCostPrice(e.target.value)}
                   className="h-9 font-mono text-xs rounded-xl bg-background"
                 />
               </div>
@@ -4908,8 +4916,9 @@ function ReorderPage() {
                   type="number"
                   min="0"
                   step="0.5"
+                  placeholder="0.00"
                   value={quickSellPrice}
-                  onChange={(e) => setQuickSellPrice(Number(e.target.value) || 0)}
+                  onChange={(e) => setQuickSellPrice(e.target.value)}
                   className="h-9 font-mono text-xs rounded-xl bg-background"
                 />
               </div>
@@ -4921,8 +4930,9 @@ function ReorderPage() {
                 <Input
                   type="number"
                   min="1"
+                  placeholder="1"
                   value={quickOrderQty}
-                  onChange={(e) => setQuickOrderQty(Math.max(1, Number(e.target.value) || 1))}
+                  onChange={(e) => setQuickOrderQty(e.target.value)}
                   className="h-9 font-mono font-bold text-xs rounded-xl bg-background border-emerald-500/40"
                 />
               </div>

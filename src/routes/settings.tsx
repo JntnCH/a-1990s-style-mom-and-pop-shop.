@@ -245,7 +245,7 @@ function SettingsPage() {
           setFollowers(res.data.followers as LineUserFollower[]);
         }
         setSyncStatusMsg(
-            lineSyncError ||
+          lineSyncError ||
             (syncLiveLineFollowers
               ? `ซิงค์ผู้ติดตาม LINE OA สำเร็จ ${lineSyncCount} รายการ`
               : "ข้อมูลประสานตรงกันเรียบร้อยแล้ว (All Data Synchronized)"),
@@ -659,7 +659,8 @@ function SettingsPage() {
                   รายชื่อที่บันทึกไว้ในระบบ พร้อม LINE User ID และสิทธิ์การใช้งาน
                 </p>
                 <p className="mt-1 text-[11px] text-muted-foreground">
-                  ซิงค์ผู้ติดตาม LINE OA จริงได้เมื่อมี Channel Access Token และบัญชี Verified/Premium; กลุ่มแชตต้องเพิ่มด้วย Group ID
+                  ซิงค์ผู้ติดตาม LINE OA จริงได้เมื่อมี Channel Access Token และบัญชี
+                  Verified/Premium; กลุ่มแชตต้องเพิ่มด้วย Group ID
                 </p>
               </div>
               <div className="flex items-center gap-2">

@@ -123,7 +123,6 @@ export function createStockAlertFlexBubble(
     });
   });
 
-
   return {
     type: "flex" as const,
     altText: `⚠️ ${title} (${items.length} รายการ) - ${storeName}`,

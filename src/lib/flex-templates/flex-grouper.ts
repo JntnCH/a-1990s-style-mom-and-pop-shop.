@@ -5,11 +5,7 @@
 import { MasterStore } from "../store";
 
 export type FlexItemGroupBy =
-  | "zone_then_category"
-  | "category_then_zone"
-  | "zone"
-  | "category"
-  | "none";
+  "zone_then_category" | "category_then_zone" | "zone" | "category" | "none";
 
 export interface ItemWithCategoryAndZone {
   name: string;

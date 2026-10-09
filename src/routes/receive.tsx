@@ -121,8 +121,8 @@ function ReceiveCheckPage() {
   const [addModalOpen, setAddModalOpen] = useState(false);
   const [addSearch, setAddSearch] = useState("");
   const [addSelectedProdId, setAddSelectedProdId] = useState("");
-  const [addExpectedQty, setAddExpectedQty] = useState(10);
-  const [addReceivedQty, setAddReceivedQty] = useState(10);
+  const [addExpectedQty, setAddExpectedQty] = useState<string>("1");
+  const [addReceivedQty, setAddReceivedQty] = useState<string>("1");
   const [addUnit, setAddUnit] = useState("ชิ้น");
 
   // Real-time synchronization
@@ -282,14 +282,17 @@ function ReceiveCheckPage() {
     if (!prod) return;
 
     const uName = addUnit || units.find((u) => u.id === prod.unitId)?.name || "ชิ้น";
+    const parsedExp = addExpectedQty.trim() === "" ? 1 : Number(addExpectedQty);
+    const parsedRec = addReceivedQty.trim() === "" ? 0 : Number(addReceivedQty);
+
     const newItem: ReceiveCheckItem = {
       id: `manual-item-${Date.now()}`,
       productId: prod.id,
       barcode: prod.barcode,
       productName: prod.name,
       unit: uName,
-      expectedQuantity: addExpectedQty,
-      receivedQuantity: addReceivedQty,
+      expectedQuantity: isNaN(parsedExp) ? 1 : Math.max(0, parsedExp),
+      receivedQuantity: isNaN(parsedRec) ? 0 : Math.max(0, parsedRec),
       isReceived: true,
       format: prod.format,
       codeType: prod.codeType,
@@ -912,9 +915,10 @@ function ReceiveCheckPage() {
                 <Input
                   type="number"
                   min="0"
+                  placeholder="0"
                   className="h-10 rounded-xl font-mono text-center font-bold"
                   value={addExpectedQty}
-                  onChange={(e) => setAddExpectedQty(Number(e.target.value) || 0)}
+                  onChange={(e) => setAddExpectedQty(e.target.value)}
                 />
               </div>
 
@@ -923,9 +927,10 @@ function ReceiveCheckPage() {
                 <Input
                   type="number"
                   min="0"
+                  placeholder="0"
                   className="h-10 rounded-xl font-mono text-center font-bold text-emerald-600"
                   value={addReceivedQty}
-                  onChange={(e) => setAddReceivedQty(Number(e.target.value) || 0)}
+                  onChange={(e) => setAddReceivedQty(e.target.value)}
                 />
               </div>
             </div>

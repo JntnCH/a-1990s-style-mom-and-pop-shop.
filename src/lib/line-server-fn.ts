@@ -292,7 +292,8 @@ export const syncLineFollowersFn = createServerFn({ method: "POST" }).handler(as
         if (response.status === 401) {
           return {
             success: false as const,
-            message: "LINE Channel Access Token ไม่ถูกต้องหรือหมดอายุ กรุณาตรวจสอบค่า server secret",
+            message:
+              "LINE Channel Access Token ไม่ถูกต้องหรือหมดอายุ กรุณาตรวจสอบค่า server secret",
           };
         }
         return {
@@ -312,7 +313,8 @@ export const syncLineFollowersFn = createServerFn({ method: "POST" }).handler(as
       if (page === maxPages - 1) {
         return {
           success: false as const,
-          message: "พบผู้ติดตามมากกว่า 20,000 รายการ จึงหยุดซิงค์เพื่อป้องกันการดึงข้อมูลเกินจำเป็น",
+          message:
+            "พบผู้ติดตามมากกว่า 20,000 รายการ จึงหยุดซิงค์เพื่อป้องกันการดึงข้อมูลเกินจำเป็น",
         };
       }
     }
@@ -328,7 +330,9 @@ export const syncLineFollowersFn = createServerFn({ method: "POST" }).handler(as
         nextIndex += 1;
         const userId = uniqueUserIds[index];
         if (!userId) continue;
-        const existing = globalServerDatabase.followers.find((follower) => follower.userId === userId);
+        const existing = globalServerDatabase.followers.find(
+          (follower) => follower.userId === userId,
+        );
 
         try {
           const profileResponse = await fetch(
@@ -366,7 +370,9 @@ export const syncLineFollowersFn = createServerFn({ method: "POST" }).handler(as
 
     await Promise.all(workers);
     const currentFollowers = removeLegacySampleLineFollowers(globalServerDatabase.followers);
-    const mergedFollowers = new Map(currentFollowers.map((follower) => [follower.userId, follower]));
+    const mergedFollowers = new Map(
+      currentFollowers.map((follower) => [follower.userId, follower]),
+    );
     profiles.forEach((profile) => mergedFollowers.set(profile.userId, profile));
     globalServerDatabase.followers = [...mergedFollowers.values()];
 

@@ -444,10 +444,20 @@ export function ProductImageUploader({
             )}
           </div>
           <DialogFooter className="gap-2">
-            <Button variant="outline" size="sm" className="h-10 rounded-xl" onClick={() => setUrlInputOpen(false)}>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-10 rounded-xl"
+              onClick={() => setUrlInputOpen(false)}
+            >
               ยกเลิก
             </Button>
-            <Button size="sm" className="h-10 rounded-xl" onClick={handleApplyUrl} disabled={!manualUrl.trim()}>
+            <Button
+              size="sm"
+              className="h-10 rounded-xl"
+              onClick={handleApplyUrl}
+              disabled={!manualUrl.trim()}
+            >
               นำไปใช้
             </Button>
           </DialogFooter>

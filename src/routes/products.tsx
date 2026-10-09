@@ -130,12 +130,12 @@ function ProductsPage() {
   const [formCategory, setFormCategory] = useState("");
   const [formZone, setFormZone] = useState("");
   const [formUnit, setFormUnit] = useState("");
-  const [formCost, setFormCost] = useState<number>(0);
-  const [formPrice, setFormPrice] = useState<number>(0);
-  const [formStock, setFormStock] = useState<number>(10);
-  const [formMinStock, setFormMinStock] = useState<number>(5);
-  const [formTargetStock, setFormTargetStock] = useState<number>(20);
-  const [formReorderQty, setFormReorderQty] = useState<number>(15);
+  const [formCost, setFormCost] = useState<string>("");
+  const [formPrice, setFormPrice] = useState<string>("");
+  const [formStock, setFormStock] = useState<string>("");
+  const [formMinStock, setFormMinStock] = useState<string>("");
+  const [formTargetStock, setFormTargetStock] = useState<string>("");
+  const [formReorderQty, setFormReorderQty] = useState<string>("");
   const [formIsActive, setFormIsActive] = useState<boolean>(true);
 
   // Form Validation & Error State
@@ -287,12 +287,12 @@ function ProductsPage() {
     setFormCategory(categories[0]?.id || "");
     setFormZone(zones[0]?.id || "");
     setFormUnit(units[0]?.id || "");
-    setFormCost(0);
-    setFormPrice(0);
-    setFormStock(10);
-    setFormMinStock(5);
-    setFormTargetStock(20);
-    setFormReorderQty(15);
+    setFormCost("");
+    setFormPrice("");
+    setFormStock("");
+    setFormMinStock("");
+    setFormTargetStock("");
+    setFormReorderQty("");
     setFormIsActive(true);
     setFormError(null);
     setSkuError(null);
@@ -332,12 +332,29 @@ function ProductsPage() {
     setFormCategory(product.categoryId);
     setFormZone(product.zoneId || "");
     setFormUnit(product.unitId);
-    setFormCost(product.costPrice);
-    setFormPrice(product.sellPrice);
-    setFormStock(product.stock);
-    setFormMinStock(product.minStock);
-    setFormTargetStock(product.targetStock || product.reorderQuantity || 20);
-    setFormReorderQty(product.reorderQuantity || 15);
+    setFormCost(
+      product.costPrice !== undefined && product.costPrice !== null
+        ? String(product.costPrice)
+        : "",
+    );
+    setFormPrice(
+      product.sellPrice !== undefined && product.sellPrice !== null
+        ? String(product.sellPrice)
+        : "",
+    );
+    setFormStock(
+      product.stock !== undefined && product.stock !== null ? String(product.stock) : "",
+    );
+    setFormMinStock(
+      product.minStock !== undefined && product.minStock !== null ? String(product.minStock) : "",
+    );
+    const target = product.targetStock ?? product.reorderQuantity;
+    setFormTargetStock(target !== undefined && target !== null ? String(target) : "");
+    setFormReorderQty(
+      product.reorderQuantity !== undefined && product.reorderQuantity !== null
+        ? String(product.reorderQuantity)
+        : "",
+    );
     setFormIsActive(product.isActive ?? true);
     setFormError(null);
     setSkuError(null);
@@ -367,6 +384,14 @@ function ProductsPage() {
       return;
     }
 
+    const parsedCost = formCost.trim() === "" ? 0 : Number(formCost);
+    const parsedPrice = formPrice.trim() === "" ? 0 : Number(formPrice);
+    const parsedStock = formStock.trim() === "" ? 0 : Number(formStock);
+    const parsedMinStock = formMinStock.trim() === "" ? 0 : Number(formMinStock);
+    const parsedTargetStock = formTargetStock.trim() === "" ? 0 : Number(formTargetStock);
+    const parsedReorderQty =
+      formReorderQty.trim() === "" ? parsedTargetStock : Number(formReorderQty);
+
     if (editingProduct) {
       MasterStore.updateProduct(editingProduct.id, {
         sku: effectiveSku,
@@ -378,12 +403,12 @@ function ProductsPage() {
         categoryId: formCategory || categories[0]?.id || "cat-general",
         zoneId: formZone || undefined,
         unitId: formUnit || units[0]?.id || "unit-piece",
-        costPrice: Number(formCost) || 0,
-        sellPrice: Number(formPrice) || 0,
-        stock: Number(formStock) || 0,
-        minStock: Number(formMinStock) || 0,
-        targetStock: Number(formTargetStock) || Number(formReorderQty) || 20,
-        reorderQuantity: Number(formReorderQty) || Number(formTargetStock) || 15,
+        costPrice: isNaN(parsedCost) ? 0 : parsedCost,
+        sellPrice: isNaN(parsedPrice) ? 0 : parsedPrice,
+        stock: isNaN(parsedStock) ? 0 : parsedStock,
+        minStock: isNaN(parsedMinStock) ? 0 : parsedMinStock,
+        targetStock: isNaN(parsedTargetStock) ? 0 : parsedTargetStock,
+        reorderQuantity: isNaN(parsedReorderQty) ? 0 : parsedReorderQty,
         isActive: formIsActive,
       });
       toast.success("อัปเดตข้อมูลสินค้าสำเร็จ");
@@ -398,12 +423,12 @@ function ProductsPage() {
         categoryId: formCategory || categories[0]?.id || "cat-general",
         zoneId: formZone || undefined,
         unitId: formUnit || units[0]?.id || "unit-piece",
-        costPrice: Number(formCost) || 0,
-        sellPrice: Number(formPrice) || 0,
-        stock: Number(formStock) || 0,
-        minStock: Number(formMinStock) || 0,
-        targetStock: Number(formTargetStock) || Number(formReorderQty) || 20,
-        reorderQuantity: Number(formReorderQty) || Number(formTargetStock) || 15,
+        costPrice: isNaN(parsedCost) ? 0 : parsedCost,
+        sellPrice: isNaN(parsedPrice) ? 0 : parsedPrice,
+        stock: isNaN(parsedStock) ? 0 : parsedStock,
+        minStock: isNaN(parsedMinStock) ? 0 : parsedMinStock,
+        targetStock: isNaN(parsedTargetStock) ? 0 : parsedTargetStock,
+        reorderQuantity: isNaN(parsedReorderQty) ? 0 : parsedReorderQty,
         isActive: formIsActive,
       });
       toast.success("เพิ่มสินค้าใหม่สำเร็จ");
@@ -1134,7 +1159,7 @@ function ProductsPage() {
                 type="button"
                 size="lg"
                 variant={scannerActive ? "destructive" : "default"}
-                  className={`w-full min-w-0 h-12 sm:h-13 rounded-xl font-bold text-sm sm:text-base gap-2 shadow-none transition-all active:scale-98 ${
+                className={`w-full min-w-0 h-12 sm:h-13 rounded-xl font-bold text-sm sm:text-base gap-2 shadow-none transition-all active:scale-98 ${
                   !scannerActive
                     ? "bg-primary hover:bg-primary/90 text-primary-foreground"
                     : "bg-destructive hover:bg-destructive/90 text-destructive-foreground"
@@ -1312,9 +1337,10 @@ function ProductsPage() {
                   type="number"
                   step="0.25"
                   min="0"
+                  placeholder="0.00"
                   className="h-10 rounded-xl bg-background"
                   value={formCost}
-                  onChange={(e) => setFormCost(Number(e.target.value))}
+                  onChange={(e) => setFormCost(e.target.value)}
                 />
               </div>
               <div className="space-y-1.5">
@@ -1323,9 +1349,10 @@ function ProductsPage() {
                   type="number"
                   step="0.25"
                   min="0"
+                  placeholder="0.00"
                   className="h-10 rounded-xl bg-background font-bold text-foreground"
                   value={formPrice}
-                  onChange={(e) => setFormPrice(Number(e.target.value))}
+                  onChange={(e) => setFormPrice(e.target.value)}
                 />
               </div>
             </div>
@@ -1337,9 +1364,10 @@ function ProductsPage() {
                 <Input
                   type="number"
                   min="0"
+                  placeholder="0"
                   className="h-10 rounded-xl font-bold"
                   value={formStock}
-                  onChange={(e) => setFormStock(Number(e.target.value))}
+                  onChange={(e) => setFormStock(e.target.value)}
                 />
               </div>
               <div className="space-y-1.5">
@@ -1347,20 +1375,22 @@ function ProductsPage() {
                 <Input
                   type="number"
                   min="0"
+                  placeholder="0"
                   className="h-10 rounded-xl"
                   value={formMinStock}
-                  onChange={(e) => setFormMinStock(Number(e.target.value))}
+                  onChange={(e) => setFormMinStock(e.target.value)}
                 />
               </div>
               <div className="space-y-1.5">
                 <Label className="text-xs text-muted-foreground">เป้าหมายในสต็อก</Label>
                 <Input
                   type="number"
-                  min="1"
+                  min="0"
+                  placeholder="0"
                   className="h-10 rounded-xl"
                   value={formTargetStock}
                   onChange={(e) => {
-                    const val = Number(e.target.value);
+                    const val = e.target.value;
                     setFormTargetStock(val);
                     setFormReorderQty(val);
                   }}
