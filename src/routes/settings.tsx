@@ -96,6 +96,12 @@ import {
   type UnitItem,
   type ZoneItem,
 } from "@/lib/store";
+import { toast } from "sonner";
+import {
+  generateCategoryCode,
+  getCategoryCodeSuggestions,
+  autoFillMissingCategoryCodes,
+} from "@/lib/category-code-generator";
 
 export const Route = createFileRoute("/settings")({
   head: () => ({
@@ -130,6 +136,7 @@ function SettingsPage() {
   const [catModalOpen, setCatModalOpen] = useState(false);
   const [editingCat, setEditingCat] = useState<CategoryItem | null>(null);
   const [catForm, setCatForm] = useState({ name: "", code: "" });
+  const [isCodeManuallyEdited, setIsCodeManuallyEdited] = useState(false);
 
   // Unit State
   const [units, setUnits] = useState<UnitItem[]>([]);
@@ -309,28 +316,90 @@ function SettingsPage() {
   // Category CRUD
   const handleSaveCategory = () => {
     if (!catForm.name.trim()) return;
+    const cleanCode = catForm.code.trim();
+    const finalCode =
+      cleanCode && cleanCode !== "-" && cleanCode !== "—"
+        ? cleanCode.toUpperCase()
+        : generateCategoryCode(catForm.name, categories, editingCat?.id);
+
     if (editingCat) {
-      MasterStore.updateCategory(editingCat.id, catForm);
+      MasterStore.updateCategory(editingCat.id, { name: catForm.name.trim(), code: finalCode });
+      toast.success(`อัปเดตหมวดหมู่ "${catForm.name.trim()}" (รหัส: ${finalCode}) เรียบร้อย`);
     } else {
-      MasterStore.addCategory(catForm);
+      MasterStore.addCategory({ name: catForm.name.trim(), code: finalCode });
+      toast.success(`เพิ่มหมวดหมู่ "${catForm.name.trim()}" (รหัส: ${finalCode}) สำเร็จ`);
     }
     setCatModalOpen(false);
     setEditingCat(null);
     setCatForm({ name: "", code: "" });
+    setIsCodeManuallyEdited(false);
+    reloadData();
     void syncWithCentralServer();
+  };
+
+  const handleOpenAddCategory = () => {
+    setEditingCat(null);
+    setIsCodeManuallyEdited(false);
+    setCatForm({ name: "", code: "" });
+    setCatModalOpen(true);
   };
 
   const handleEditCategory = (item: CategoryItem) => {
     setEditingCat(item);
-    setCatForm({ name: item.name, code: item.code || "" });
+    const hasValidCode = Boolean(item.code && item.code !== "-" && item.code !== "—");
+    setIsCodeManuallyEdited(hasValidCode);
+    // If category didn't have a code yet, auto-suggest standard code immediately
+    const effectiveCode = hasValidCode
+      ? item.code
+      : generateCategoryCode(item.name, categories, item.id);
+    setCatForm({ name: item.name, code: effectiveCode });
     setCatModalOpen(true);
+  };
+
+  const handleCategoryNameChange = (name: string) => {
+    if (!isCodeManuallyEdited) {
+      const autoCode = generateCategoryCode(name, categories, editingCat?.id);
+      setCatForm({ name, code: autoCode });
+    } else {
+      setCatForm((prev) => ({ ...prev, name }));
+    }
+  };
+
+  const handleCategoryCodeChange = (code: string) => {
+    setIsCodeManuallyEdited(true);
+    setCatForm((prev) => ({ ...prev, code: code.toUpperCase() }));
+  };
+
+  const handleRegenerateCategoryCode = () => {
+    const autoCode = generateCategoryCode(catForm.name, categories, editingCat?.id);
+    setIsCodeManuallyEdited(false);
+    setCatForm((prev) => ({ ...prev, code: autoCode }));
+    toast.success(`สร้างรหัส ${autoCode} ให้อัตโนมัติ`);
   };
 
   const handleDeleteCategory = (id: string) => {
     if (confirm("ต้องการลบหมวดหมู่นี้ใช่หรือไม่?")) {
       MasterStore.deleteCategory(id);
+      reloadData();
       void syncWithCentralServer();
     }
+  };
+
+  const missingCategoryCodeCount = categories.filter(
+    (c) => !c.code || c.code.trim() === "" || c.code.trim() === "-" || c.code.trim() === "—",
+  ).length;
+
+  const handleAutoFillAllMissingCodes = () => {
+    const { updated, fixedCount } = autoFillMissingCategoryCodes(categories);
+    if (fixedCount === 0) {
+      toast.info("หมวดหมู่ทุกรายการมีรหัสเรียบร้อยแล้ว");
+      return;
+    }
+    MasterStore.saveCategories(updated as CategoryItem[]);
+    setCategories(updated as CategoryItem[]);
+    toast.success(`สร้างรหัสหมวดหมู่อัตโนมัติสำเร็จ ${fixedCount} รายการเรียบร้อยแล้ว`);
+    reloadData();
+    void syncWithCentralServer();
   };
 
   // Unit CRUD
@@ -1068,20 +1137,42 @@ function SettingsPage() {
               <div>
                 <h2 className="text-base sm:text-lg font-bold text-foreground">หมวดหมู่สินค้า</h2>
                 <p className="text-xs text-muted-foreground">
-                  จัดกลุ่มประเภทสินค้าเพื่อการค้นหาที่รวดเร็ว
+                  จัดกลุ่มประเภทสินค้าเพื่อการค้นหาที่รวดเร็ว พร้อมสร้างรหัสย่ออัตโนมัติ
                 </p>
               </div>
               <Button
                 className="h-11 sm:h-10 font-semibold gap-1.5 rounded-xl active:scale-95 shadow-sm"
-                onClick={() => {
-                  setEditingCat(null);
-                  setCatForm({ name: "", code: "" });
-                  setCatModalOpen(true);
-                }}
+                onClick={handleOpenAddCategory}
               >
                 <Plus className="size-4" /> เพิ่มหมวดหมู่ใหม่
               </Button>
             </div>
+
+            {/* Missing Code Quick Auto-Fill Banner */}
+            {missingCategoryCodeCount > 0 && (
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-900 dark:text-amber-200">
+                <div className="flex items-start gap-2.5">
+                  <Sparkles className="size-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-xs sm:text-sm font-semibold">
+                      พบ {missingCategoryCodeCount} หมวดหมู่ที่ยังไม่มีรหัสย่อ (Code)
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      ระบบสามารถสร้างรหัสย่อมาตรฐานให้อัตโนมัติ เช่น นม → MLK, เหล้า → ALC, เบียร์ →
+                      BEER, บุหรี่ → TOB, โค้ก → COKE
+                    </p>
+                  </div>
+                </div>
+                <Button
+                  size="sm"
+                  className="bg-amber-600 hover:bg-amber-700 text-white font-semibold rounded-xl text-xs gap-1.5 shrink-0 self-start sm:self-auto shadow-xs active:scale-95"
+                  onClick={handleAutoFillAllMissingCodes}
+                >
+                  <Sparkles className="size-3.5" /> สร้างรหัสอัตโนมัติทั้งหมด (
+                  {missingCategoryCodeCount})
+                </Button>
+              </div>
+            )}
 
             {/* Mobile Category Cards */}
             <div className="block md:hidden space-y-2">
@@ -1826,25 +1917,83 @@ function SettingsPage() {
               <DialogTitle className="text-base sm:text-lg">
                 {editingCat ? "แก้ไขหมวดหมู่สินค้า" : "เพิ่มหมวดหมู่สินค้าใหม่"}
               </DialogTitle>
+              <DialogDescription className="text-xs">
+                กำหนดชื่อและรหัสหมวดหมู่สินค้า ระบบจะกรอกรหัสให้อัตโนมัติขณะพิมพ์ชื่อ
+              </DialogDescription>
             </DialogHeader>
-            <div className="space-y-3 py-2">
+            <div className="space-y-3.5 py-2">
               <div className="space-y-1.5">
-                <Label className="text-xs font-semibold">ชื่อหมวดหมู่ *</Label>
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs font-semibold">ชื่อหมวดหมู่ *</Label>
+                  <span className="text-[11px] text-emerald-600 dark:text-emerald-400 font-medium flex items-center gap-1">
+                    <Sparkles className="size-3" /> กรอกรหัสให้อัตโนมัติ
+                  </span>
+                </div>
                 <Input
-                  placeholder="เช่น เครื่องดื่ม, ขนมขบเคี้ยว"
+                  placeholder="เช่น นม, เครื่องดื่ม, ขนมขบเคี้ยว, เบียร์"
                   className="h-10 rounded-xl"
                   value={catForm.name}
-                  onChange={(e) => setCatForm({ ...catForm, name: e.target.value })}
+                  onChange={(e) => handleCategoryNameChange(e.target.value)}
+                  autoFocus
                 />
               </div>
               <div className="space-y-1.5">
-                <Label className="text-xs font-semibold">รหัสหมวดหมู่ (Code)</Label>
-                <Input
-                  placeholder="เช่น BEV, SNACK"
-                  className="h-10 font-mono rounded-xl"
-                  value={catForm.code}
-                  onChange={(e) => setCatForm({ ...catForm, code: e.target.value })}
-                />
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs font-semibold">รหัสหมวดหมู่ (Code)</Label>
+                  <button
+                    type="button"
+                    onClick={handleRegenerateCategoryCode}
+                    className="text-[11px] text-primary hover:underline flex items-center gap-1 font-medium transition-colors"
+                    title="สร้างรหัสอัตโนมัติใหม่"
+                  >
+                    <RefreshCw className="size-3" /> สร้างรหัสใหม่
+                  </button>
+                </div>
+                <div className="relative">
+                  <Input
+                    placeholder="เช่น MLK, BEV, BEER"
+                    className="h-10 font-mono rounded-xl uppercase pr-20"
+                    value={catForm.code}
+                    onChange={(e) => handleCategoryCodeChange(e.target.value)}
+                  />
+                  <div className="absolute right-2 top-1/2 -translate-y-1/2">
+                    <Badge variant="outline" className="text-[10px] font-mono py-0 h-5">
+                      {catForm.code ? `${catForm.code.length} ตัวอักษร` : "ว่าง"}
+                    </Badge>
+                  </div>
+                </div>
+
+                {/* Candidate Suggestions */}
+                {catForm.name.trim() && (
+                  <div className="space-y-1 pt-1">
+                    <span className="text-[11px] text-muted-foreground">รหัสแนะนำที่เลือกได้:</span>
+                    <div className="flex flex-wrap gap-1.5">
+                      {getCategoryCodeSuggestions(catForm.name, categories, editingCat?.id).map(
+                        (sug) => {
+                          const isSelected = catForm.code === sug;
+                          return (
+                            <button
+                              key={sug}
+                              type="button"
+                              onClick={() => {
+                                setCatForm((prev) => ({ ...prev, code: sug }));
+                                setIsCodeManuallyEdited(true);
+                              }}
+                              className={`px-2.5 py-1 rounded-lg text-xs font-mono font-bold transition-all border ${
+                                isSelected
+                                  ? "bg-emerald-600 text-white border-emerald-600 shadow-xs"
+                                  : "bg-muted/70 hover:bg-muted text-foreground border-border hover:border-foreground/30"
+                              }`}
+                            >
+                              {sug}
+                              {isSelected && " ✓"}
+                            </button>
+                          );
+                        },
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
             <DialogFooter className="gap-2 pt-2 border-t">
@@ -1860,7 +2009,7 @@ function SettingsPage() {
                 onClick={handleSaveCategory}
                 disabled={!catForm.name.trim()}
               >
-                บันทึกหมวดหมู่
+                {editingCat ? "บันทึกการแก้ไข" : "บันทึกหมวดหมู่"}
               </Button>
             </DialogFooter>
           </DialogContent>

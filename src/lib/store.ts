@@ -4,6 +4,7 @@
  */
 
 import { removeLegacySampleLineFollowers } from "./line-follower-data";
+import { generateCategoryCode } from "./category-code-generator";
 
 export interface ZoneItem {
   id: string;
@@ -427,12 +428,31 @@ export const MasterStore = {
   },
   addCategory(item: Omit<CategoryItem, "id">) {
     const list = this.getCategories();
-    const newItem: CategoryItem = { ...item, id: `cat-${Date.now()}` };
+    const cleanCode = item.code?.trim();
+    const finalCode =
+      cleanCode && cleanCode !== "-" && cleanCode !== "—"
+        ? cleanCode.toUpperCase()
+        : generateCategoryCode(item.name, list);
+    const newItem: CategoryItem = { ...item, code: finalCode, id: `cat-${Date.now()}` };
     this.saveCategories([...list, newItem]);
     return newItem;
   },
   updateCategory(id: string, updates: Partial<CategoryItem>) {
-    const list = this.getCategories().map((c) => (c.id === id ? { ...c, ...updates } : c));
+    const list = this.getCategories().map((c) => {
+      if (c.id !== id) return c;
+      const updated = { ...c, ...updates };
+      if (updates.code !== undefined) {
+        const cleanCode = updates.code.trim();
+        updated.code =
+          cleanCode && cleanCode !== "-" && cleanCode !== "—"
+            ? cleanCode.toUpperCase()
+            : generateCategoryCode(
+                updated.name,
+                list.filter((item) => item.id !== id),
+              );
+      }
+      return updated;
+    });
     this.saveCategories(list);
   },
   deleteCategory(id: string) {
