@@ -487,36 +487,36 @@ function ReceiveCheckPage() {
                 {scanStatus === "scanning" || scanStatus === "starting" ? (
                   <>
                     <Button
-                      size="sm"
+                      size="default"
                       variant="destructive"
-                      className="flex-1 h-10 rounded-xl font-semibold gap-1.5"
+                      className="flex-1 h-12 rounded-xl font-bold text-sm gap-2 active:scale-98"
                       onClick={stopScanner}
                     >
-                      <CameraOff className="size-4" /> ปิดกล้อง
+                      <CameraOff className="size-5" /> ปิดกล้องสแกนเนอร์
                     </Button>
                     {hasTorch && (
                       <Button
-                        size="sm"
+                        size="default"
                         type="button"
                         variant={isTorchOn ? "default" : "outline"}
-                        className="h-10 px-3 rounded-xl font-semibold"
+                        className="h-12 px-4 rounded-xl font-semibold active:scale-98"
                         onClick={() => void toggleTorch()}
                       >
                         {isTorchOn ? (
-                          <FlashlightOff className="size-4" />
+                          <FlashlightOff className="size-5" />
                         ) : (
-                          <Flashlight className="size-4" />
+                          <Flashlight className="size-5" />
                         )}
                       </Button>
                     )}
                   </>
                 ) : (
                   <Button
-                    size="sm"
-                    className="w-full h-10 rounded-xl font-semibold gap-2 bg-primary text-primary-foreground"
+                    size="default"
+                    className="w-full h-12 rounded-xl font-bold text-sm gap-2 bg-primary text-primary-foreground shadow-sm active:scale-98"
                     onClick={() => void startScanner()}
                   >
-                    <Camera className="size-4" /> เปิดกล้องสแกนเนอร์
+                    <Camera className="size-5" /> เปิดกล้องสแกนเนอร์รับสินค้า
                   </Button>
                 )}
               </div>

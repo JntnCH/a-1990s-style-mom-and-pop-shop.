@@ -658,6 +658,9 @@ export const MasterStore = {
   getReceives(): ReceiveItem[] {
     return safeGet<ReceiveItem[]>(STORAGE_KEYS.RECEIVES, []);
   },
+  saveReceives(items: ReceiveItem[]) {
+    safeSet(STORAGE_KEYS.RECEIVES, items);
+  },
   addReceive(item: Omit<ReceiveItem, "id">) {
     const list = this.getReceives();
     const newItem: ReceiveItem = { ...item, id: `rec-${Date.now()}` };
@@ -692,6 +695,9 @@ export const MasterStore = {
   // Stock Movement History
   getMovements(): StockMovementLog[] {
     return safeGet<StockMovementLog[]>(STORAGE_KEYS.MOVEMENTS, DEFAULT_MOVEMENTS);
+  },
+  saveMovements(items: StockMovementLog[]) {
+    safeSet(STORAGE_KEYS.MOVEMENTS, items);
   },
   addMovement(log: Omit<StockMovementLog, "id" | "timestamp">) {
     const list = this.getMovements();
@@ -863,6 +869,9 @@ export const MasterStore = {
   },
   getPurchaseOrders(): PurchaseOrderRecord[] {
     return safeGet<PurchaseOrderRecord[]>(STORAGE_KEYS.PURCHASE_ORDERS, DEFAULT_PURCHASE_ORDERS);
+  },
+  savePurchaseOrders(items: PurchaseOrderRecord[]): void {
+    safeSet(STORAGE_KEYS.PURCHASE_ORDERS, items);
   },
   getPurchaseOrderById(id: string): PurchaseOrderRecord | undefined {
     return this.getPurchaseOrders().find((po) => po.id === id);

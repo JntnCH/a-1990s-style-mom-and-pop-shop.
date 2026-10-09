@@ -8,13 +8,22 @@
  */
 
 import { DEFAULT_STORE_NAME, getSystemStoreName } from "./index";
+import {
+  type FlexItemGroupBy,
+  groupAndSortFlexItems,
+  type ItemWithCategoryAndZone,
+} from "./flex-grouper";
 
-export interface FlexOrderItem {
+export interface FlexOrderItem extends ItemWithCategoryAndZone {
   name: string;
   quantity: number;
   unitName: string;
   costPrice?: number;
   barcode?: string;
+  categoryId?: string;
+  categoryName?: string;
+  zoneId?: string;
+  zoneName?: string;
 }
 
 export interface PurchaseOrderFlexOptions {
@@ -26,11 +35,13 @@ export interface PurchaseOrderFlexOptions {
   themeColor?: string;
   liffId?: string;
   customBaseUrl?: string;
+  groupBy?: FlexItemGroupBy;
+  showGroupHeaders?: boolean;
 }
 
 /**
  * สร้าง Flex Message Bubble สำหรับใบสั่งซื้อสินค้าประจำวัน
- * รูปแบบแสดงผล: รายการ -> จำนวน -> หน่วยนับ พร้อมยอดรวมและมูลค่าโดยประมาณ
+ * รูปแบบแสดงผล: จัดกลุ่มตามโซน/หมวดหมู่ -> รายการ -> จำนวน -> หน่วยนับ พร้อมยอดรวมและมูลค่าโดยประมาณ
  * พร้อมปุ่มลัดสำหรับเปิดหน้าแดชบอร์ดหลัก และเปิดดูใบสั่งซื้อ
  */
 export function createPurchaseOrderFlexBubble(
@@ -63,37 +74,85 @@ export function createPurchaseOrderFlexBubble(
   const dashboardUrl = `${baseUrl}`;
   const reorderUrl = `${baseUrl}/reorder`;
 
+  const groupBy = options.groupBy || "zone_then_category";
+  const showGroupHeaders = options.showGroupHeaders !== false;
+
   const totalQuantity = items.reduce((sum, o) => sum + (Number(o.quantity) || 0), 0);
   const totalCost = items.reduce(
     (sum, o) => sum + (Number(o.quantity) || 0) * (Number(o.costPrice) || 0),
     0,
   );
 
-  const itemRows = items.map((item, index) => ({
-    type: "box" as const,
-    layout: "horizontal" as const,
-    spacing: "sm" as const,
-    contents: [
-      {
-        type: "text" as const,
-        text: `${index + 1}. ${item.name}`,
-        size: "sm" as const,
-        color: "#1f2937",
-        flex: 6,
-        wrap: true,
-      },
-      {
-        type: "text" as const,
-        text: `${item.quantity} ${item.unitName}`,
-        size: "sm" as const,
-        color: "#059669",
-        weight: "bold" as const,
-        align: "end" as const,
-        flex: 4,
-        wrap: true,
-      },
-    ],
-  }));
+  // Group and sort items so products in the same category or zone are adjacent
+  const groupedList = groupAndSortFlexItems(items, groupBy);
+
+  const itemRows: Record<string, unknown>[] = [];
+  let globalIndex = 0;
+
+  groupedList.forEach((grp, grpIdx) => {
+    // Add stylish group header banner if enabled and multiple or named groups exist
+    if (showGroupHeaders && grp.headerTitle && groupBy !== "none") {
+      itemRows.push({
+        type: "box",
+        layout: "horizontal",
+        backgroundColor: "#f3f4f6",
+        paddingAll: "sm",
+        cornerRadius: "md",
+        margin: grpIdx === 0 ? "xs" : "md",
+        contents: [
+          {
+            type: "text",
+            text: grp.headerTitle,
+            size: "xs",
+            color: "#1e293b",
+            weight: "bold",
+            wrap: true,
+            flex: 8,
+          },
+          {
+            type: "text",
+            text: `${grp.items.length} รายการ`,
+            size: "xxs",
+            color: "#64748b",
+            align: "end",
+            weight: "bold",
+            flex: 4,
+          },
+        ],
+      });
+    }
+
+    grp.items.forEach(({ item }) => {
+      globalIndex++;
+      itemRows.push({
+        type: "box",
+        layout: "horizontal",
+        spacing: "sm",
+        margin: "xs",
+        contents: [
+          {
+            type: "text",
+            text: `${globalIndex}. ${item.name}`,
+            size: "sm",
+            color: "#1f2937",
+            flex: 6,
+            wrap: true,
+          },
+          {
+            type: "text",
+            text: `${item.quantity} ${item.unitName}`,
+            size: "sm",
+            color: "#059669",
+            weight: "bold",
+            align: "end",
+            flex: 4,
+            wrap: true,
+          },
+        ],
+      });
+    });
+  });
+
 
   return {
     type: "flex" as const,

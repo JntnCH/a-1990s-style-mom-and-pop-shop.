@@ -41,6 +41,7 @@ export function getSystemStoreName(override?: string): string {
   return DEFAULT_STORE_NAME;
 }
 
+export * from "./flex-grouper";
 export * from "./purchase-order-flex";
 export * from "./stock-alert-flex";
 export * from "./daily-summary-flex";

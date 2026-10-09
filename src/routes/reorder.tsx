@@ -93,7 +93,9 @@ import {
   createPurchaseOrderFlexBubble,
   createStockAlertFlexBubble,
   DEFAULT_STORE_NAME,
+  type FlexItemGroupBy,
   getSystemStoreName,
+  groupAndSortFlexItems,
 } from "@/lib/flex-templates";
 import { FlexMessageVisualizer } from "@/components/line/FlexMessageVisualizer";
 import { FlexSimulatorImporter } from "@/components/line/FlexSimulatorImporter";
@@ -186,6 +188,19 @@ function ReorderPage() {
     costPrice?: number | undefined;
     note?: string | undefined;
   }
+
+  type FullOrderItem = OrderFlexItem & {
+    product: ProductItem;
+    barcode: string;
+    unitId: string;
+    costPrice: number;
+    priceEstimate: number;
+    note?: string | undefined;
+    categoryId?: string | undefined;
+    categoryName?: string | undefined;
+    zoneId?: string | undefined;
+    zoneName?: string | undefined;
+  };
   const [orderList, setOrderList] = useState<OrderCartItem[]>([]);
   const [supplierNameInput, setSupplierNameInput] = useState(
     "บริษัท ยูนิลีเวอร์ / ซัพพลายเออร์หลัก",
@@ -269,10 +284,17 @@ function ReorderPage() {
     }
   }, [pushModalOpen]);
 
-  // Flex Preview Visualizer Modal
+  // Flex Preview Visualizer Modal & Grouping Mode
   const [flexPreviewOpen, setFlexPreviewOpen] = useState(false);
   const [flexPreviewData, setFlexPreviewData] = useState<unknown>(null);
   const [flexPreviewTitle, setFlexPreviewTitle] = useState("ตัวอย่าง LINE Flex Message");
+  const [flexGroupBy, setFlexGroupBy] = useState<FlexItemGroupBy>("zone_then_category");
+  const [flexPreviewSource, setFlexPreviewSource] = useState<{
+    type: "order" | "alert" | "po";
+    orderItems?: FullOrderItem[];
+    alertItems?: Parameters<typeof createStockAlertFlexBubble>[0];
+    poRecord?: PurchaseOrderRecord;
+  } | null>(null);
 
   // Sending & processing status
   const [isSending, setIsSending] = useState(false);
@@ -841,14 +863,6 @@ function ReorderPage() {
   };
 
   // Convert orderList to complete items with product data
-  type FullOrderItem = OrderFlexItem & {
-    product: ProductItem;
-    barcode: string;
-    unitId: string;
-    costPrice: number;
-    priceEstimate: number;
-    note?: string | undefined;
-  };
   const fullItems: FullOrderItem[] = orderList.map((item): FullOrderItem => {
     const product = products.find((p) => p.id === item.productId);
     const effectiveUnitId = item.unitId || product?.unitId || units[0]?.id || "unit-piece";
@@ -887,6 +901,10 @@ function ReorderPage() {
       costPrice: effectiveCostPrice,
       priceEstimate: effectiveCostPrice * item.quantity,
       note: item.note,
+      categoryId: effectiveProduct.categoryId,
+      categoryName: getCatName(effectiveProduct.categoryId),
+      zoneId: effectiveProduct.zoneId,
+      zoneName: zones.find((z) => z.id === effectiveProduct.zoneId)?.name,
     };
   });
 
@@ -1121,47 +1139,118 @@ function ReorderPage() {
     setPushModalOpen(true);
   };
 
-  // Flex Preview Handlers
-  const handlePreviewOrderFlex = () => {
+  // Flex Preview Handlers with Grouping Support
+  const handlePreviewOrderFlex = (overrideGroupBy?: FlexItemGroupBy) => {
     if (fullItems.length === 0) return;
+    const gb = overrideGroupBy || flexGroupBy;
     const orderDateStr = new Date().toLocaleDateString("th-TH");
-    const flexMsg = formatDailyOrderFlexMessage(fullItems, orderDateStr, currentStoreName);
+    const flexMsg = formatDailyOrderFlexMessage(fullItems, orderDateStr, currentStoreName, {
+      groupBy: gb,
+    });
     setFlexPreviewData(flexMsg);
     setFlexPreviewTitle(`ใบสั่งซื้อสินค้า (${fullItems.length} รายการ, รวม ${totalQuantity} ชิ้น)`);
+    setFlexPreviewSource({ type: "order", orderItems: fullItems });
     setFlexPreviewOpen(true);
   };
 
-  const handlePreviewStockAlertFlex = () => {
+  const handlePreviewStockAlertFlex = (overrideGroupBy?: FlexItemGroupBy) => {
     if (allReorderNeeded.length === 0) return;
+    const gb = overrideGroupBy || flexGroupBy;
     const alertPayload = allReorderNeeded.map((p) => ({
       name: p.name,
       stock: p.stock,
       minStock: p.minStock,
       unitName: getUnitName(p.unitId),
       status: (p.stock <= 0 ? "OUT_OF_STOCK" : "LOW_STOCK") as "OUT_OF_STOCK" | "LOW_STOCK",
+      categoryId: p.categoryId,
+      categoryName: getCatName(p.categoryId),
+      zoneId: p.zoneId,
+      zoneName: zones.find((z) => z.id === p.zoneId)?.name,
+      barcode: p.barcode,
     }));
-    const flexMsg = createStockAlertFlexBubble(alertPayload, { storeName: currentStoreName });
+    const flexMsg = createStockAlertFlexBubble(alertPayload, {
+      storeName: currentStoreName,
+      groupBy: gb,
+    });
     setFlexPreviewData(flexMsg);
     setFlexPreviewTitle(`แจ้งเตือนสินค้าต้องสั่งซื้อ (${allReorderNeeded.length} รายการ)`);
+    setFlexPreviewSource({ type: "alert", alertItems: alertPayload });
     setFlexPreviewOpen(true);
   };
 
-  const handlePreviewPOHistoryFlex = (po: PurchaseOrderRecord) => {
-    const items = po.items.map((i) => ({
-      name: i.productName,
-      quantity: i.quantity,
-      unitName: i.unitName,
-      costPrice: i.costPrice,
-      barcode: i.barcode,
-    }));
+  const handlePreviewPOHistoryFlex = (
+    po: PurchaseOrderRecord,
+    overrideGroupBy?: FlexItemGroupBy,
+  ) => {
+    const gb = overrideGroupBy || flexGroupBy;
+    const items = po.items.map((i) => {
+      const p = products.find((prod) => prod.id === i.productId);
+      return {
+        name: i.productName,
+        quantity: i.quantity,
+        unitName: i.unitName,
+        costPrice: i.costPrice,
+        barcode: i.barcode,
+        categoryId: p?.categoryId,
+        categoryName: p ? getCatName(p.categoryId) : undefined,
+        zoneId: p?.zoneId,
+        zoneName: p ? zones.find((z) => z.id === p.zoneId)?.name : undefined,
+      };
+    });
     const flexMsg = createPurchaseOrderFlexBubble(items, {
       storeName: currentStoreName,
       orderNumber: po.orderNumber,
       note: `ใบสั่งซื้อ #${po.orderNumber}`,
+      groupBy: gb,
     });
     setFlexPreviewData(flexMsg);
     setFlexPreviewTitle(`ใบสั่งซื้อ ${po.orderNumber}`);
+    setFlexPreviewSource({ type: "po", poRecord: po });
     setFlexPreviewOpen(true);
+  };
+
+  const handleUpdateFlexGrouping = (newGrouping: FlexItemGroupBy) => {
+    setFlexGroupBy(newGrouping);
+    if (!flexPreviewSource) return;
+
+    if (flexPreviewSource.type === "order" && flexPreviewSource.orderItems) {
+      const orderDateStr = new Date().toLocaleDateString("th-TH");
+      const flexMsg = formatDailyOrderFlexMessage(
+        flexPreviewSource.orderItems,
+        orderDateStr,
+        currentStoreName,
+        { groupBy: newGrouping },
+      );
+      setFlexPreviewData(flexMsg);
+    } else if (flexPreviewSource.type === "alert" && flexPreviewSource.alertItems) {
+      const flexMsg = createStockAlertFlexBubble(flexPreviewSource.alertItems, {
+        storeName: currentStoreName,
+        groupBy: newGrouping,
+      });
+      setFlexPreviewData(flexMsg);
+    } else if (flexPreviewSource.type === "po" && flexPreviewSource.poRecord) {
+      const items = flexPreviewSource.poRecord.items.map((i) => {
+        const p = products.find((prod) => prod.id === i.productId);
+        return {
+          name: i.productName,
+          quantity: i.quantity,
+          unitName: i.unitName,
+          costPrice: i.costPrice,
+          barcode: i.barcode,
+          categoryId: p?.categoryId,
+          categoryName: p ? getCatName(p.categoryId) : undefined,
+          zoneId: p?.zoneId,
+          zoneName: p ? zones.find((z) => z.id === p.zoneId)?.name : undefined,
+        };
+      });
+      const flexMsg = createPurchaseOrderFlexBubble(items, {
+        storeName: currentStoreName,
+        orderNumber: flexPreviewSource.poRecord.orderNumber,
+        note: `ใบสั่งซื้อ #${flexPreviewSource.poRecord.orderNumber}`,
+        groupBy: newGrouping,
+      });
+      setFlexPreviewData(flexMsg);
+    }
   };
 
   // Add new friend / contact to local store
@@ -1238,8 +1327,16 @@ function ReorderPage() {
           minStock: p.minStock,
           unitName: getUnitName(p.unitId),
           status: (p.stock <= 0 ? "OUT_OF_STOCK" : "LOW_STOCK") as "OUT_OF_STOCK" | "LOW_STOCK",
+          categoryId: p.categoryId,
+          categoryName: getCatName(p.categoryId),
+          zoneId: p.zoneId,
+          zoneName: zones.find((z) => z.id === p.zoneId)?.name,
+          barcode: p.barcode,
         }));
-        flexMsg = createStockAlertFlexBubble(alertPayload, { storeName: currentStoreName });
+        flexMsg = createStockAlertFlexBubble(alertPayload, {
+          storeName: currentStoreName,
+          groupBy: flexGroupBy,
+        });
         plainText = `⚠️ แจ้งเตือนสินค้าต้องสั่งซื้อ ${allReorderNeeded.length} รายการ (${currentStoreName})`;
       } else {
         if (fullItems.length === 0) {
@@ -1248,8 +1345,10 @@ function ReorderPage() {
           return;
         }
         const orderDateStr = new Date().toLocaleDateString("th-TH");
-        flexMsg = formatDailyOrderFlexMessage(fullItems, orderDateStr, currentStoreName);
-        plainText = formatOrderPlainText(fullItems, orderDateStr, currentStoreName);
+        flexMsg = formatDailyOrderFlexMessage(fullItems, orderDateStr, currentStoreName, {
+          groupBy: flexGroupBy,
+        });
+        plainText = formatOrderPlainText(fullItems, orderDateStr, currentStoreName, flexGroupBy);
       }
 
       // Directly trigger Native LINE LIFF shareTargetPicker with REAL Flex Message
@@ -1352,8 +1451,16 @@ function ReorderPage() {
           minStock: p.minStock,
           unitName: getUnitName(p.unitId),
           status: (p.stock <= 0 ? "OUT_OF_STOCK" : "LOW_STOCK") as "OUT_OF_STOCK" | "LOW_STOCK",
+          categoryId: p.categoryId,
+          categoryName: getCatName(p.categoryId),
+          zoneId: p.zoneId,
+          zoneName: zones.find((z) => z.id === p.zoneId)?.name,
+          barcode: p.barcode,
         }));
-        const flexMsg = createStockAlertFlexBubble(alertPayload, { storeName: currentStoreName });
+        const flexMsg = createStockAlertFlexBubble(alertPayload, {
+          storeName: currentStoreName,
+          groupBy: flexGroupBy,
+        });
         const plainText = `⚠️ แจ้งเตือนสินค้าต้องสั่งซื้อ ${allReorderNeeded.length} รายการ (${currentStoreName})`;
 
         if (tokenToUse || serverConfig?.hasAccessToken) {
@@ -1393,8 +1500,10 @@ function ReorderPage() {
       } else {
         if (fullItems.length === 0) return;
         const orderDateStr = new Date().toLocaleDateString("th-TH");
-        const flexMsg = formatDailyOrderFlexMessage(fullItems, orderDateStr, currentStoreName);
-        const plainText = formatOrderPlainText(fullItems, orderDateStr, currentStoreName);
+        const flexMsg = formatDailyOrderFlexMessage(fullItems, orderDateStr, currentStoreName, {
+          groupBy: flexGroupBy,
+        });
+        const plainText = formatOrderPlainText(fullItems, orderDateStr, currentStoreName, flexGroupBy);
 
         if (tokenToUse || serverConfig?.hasAccessToken) {
           const res = await sendWith3TierFallback({
@@ -2437,23 +2546,80 @@ function ReorderPage() {
                       <span className="text-[11px] text-muted-foreground">{currentStoreName}</span>
                     </div>
 
-                    <div className="space-y-1.5 text-xs">
+                    {/* Flex Message Grouping Mode Selector */}
+                    <div className="p-2.5 rounded-xl bg-muted/40 border space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <Label className="text-[11px] font-bold text-foreground flex items-center gap-1.5">
+                          <SlidersHorizontal className="size-3.5 text-emerald-600" />
+                          การจัดเรียงใน Flex Message:
+                        </Label>
+                        <Badge
+                          variant="outline"
+                          className="text-[10px] border-emerald-500/40 text-emerald-700 dark:text-emerald-300"
+                        >
+                          หมวดหมู่ / โซน
+                        </Badge>
+                      </div>
+                      <select
+                        className="w-full rounded-lg border border-input bg-background px-2.5 py-1.5 text-xs font-medium shadow-xs"
+                        value={flexGroupBy}
+                        onChange={(e) => {
+                          const next = e.target.value as FlexItemGroupBy;
+                          setFlexGroupBy(next);
+                          toast.success(
+                            next === "zone_then_category"
+                              ? "จัดกลุ่มตามโซน ➔ หมวดหมู่ (โซนและหมวดเดียวกันอยู่ด้วยกัน)"
+                              : next === "category"
+                                ? "จัดกลุ่มตามหมวดหมู่สินค้า"
+                                : next === "zone"
+                                  ? "จัดกลุ่มตามโซนจัดวางสินค้า"
+                                  : "เรียงตามลำดับเดิม",
+                          );
+                        }}
+                      >
+                        <option value="zone_then_category">
+                          📍 โซน ➔ 🏷️ หมวดหมู่ (แนะนำ: จัดวางใกล้กัน)
+                        </option>
+                        <option value="category">🏷️ ตามหมวดหมู่สินค้า (เช่น เครื่องดื่ม, ของแห้ง)</option>
+                        <option value="zone">
+                          📍 ตามโซนจัดวางสินค้า (เช่น โซน A หน้าร้าน, โซน C ตู้แช่)
+                        </option>
+                        <option value="none">📄 ตามลำดับเดิมที่เพิ่ม</option>
+                      </select>
+                      <p className="text-[10px] text-muted-foreground leading-relaxed">
+                        จัดลำดับสินค้าในหมวดหมู่หรือโซนเดียวกันให้อยู่ติดกันใน LINE Flex
+                      </p>
+                    </div>
+
+                    <div className="space-y-2 text-xs">
                       {fullItems.length === 0 ? (
                         <p className="text-muted-foreground italic py-3 text-center">
                           (ยังไม่มีรายการสินค้าในใบสั่ง)
                         </p>
                       ) : (
-                        fullItems.map((item, idx) => (
-                          <div
-                            key={item.product.id}
-                            className="flex justify-between py-1 border-b border-border/40"
-                          >
-                            <span className="text-foreground truncate max-w-[180px]">
-                              {idx + 1}. {item.product.name}
-                            </span>
-                            <span className="font-bold font-mono text-emerald-700 dark:text-emerald-300 shrink-0">
-                              {item.quantity} {item.unitName}
-                            </span>
+                        groupAndSortFlexItems(fullItems, flexGroupBy).map((grp) => (
+                          <div key={grp.groupKey} className="space-y-1">
+                            {flexGroupBy !== "none" && grp.headerTitle && (
+                              <div className="text-[10px] font-bold text-foreground/85 bg-muted/70 px-2 py-0.5 rounded-md flex items-center justify-between">
+                                <span className="truncate">{grp.headerTitle}</span>
+                                <span className="text-[9px] text-muted-foreground shrink-0">
+                                  {grp.items.length} รายการ
+                                </span>
+                              </div>
+                            )}
+                            {grp.items.map(({ item }, itemIdx) => (
+                              <div
+                                key={`${grp.groupKey}-${item.product.id}-${itemIdx}`}
+                                className="flex justify-between py-1 border-b border-border/40 pl-1"
+                              >
+                                <span className="text-foreground truncate max-w-[180px]">
+                                  {item.name}
+                                </span>
+                                <span className="font-bold font-mono text-emerald-700 dark:text-emerald-300 shrink-0">
+                                  {item.quantity} {item.unitName}
+                                </span>
+                              </div>
+                            ))}
                           </div>
                         ))
                       )}
@@ -4496,6 +4662,32 @@ function ReorderPage() {
               การจำลองหน้าจอแสดงผลจริงบนแอปพลิเคชัน LINE (LINE Flex Message UI Simulation)
             </DialogDescription>
           </DialogHeader>
+
+          {/* Grouping Mode Selector Inside Preview Modal */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-2.5 rounded-xl bg-muted/40 border text-xs my-1">
+            <div className="flex items-center gap-1.5 font-bold text-foreground">
+              <SlidersHorizontal className="size-3.5 text-emerald-600" />
+              <span>การจัดกลุ่มสินค้าใน Flex Message:</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <select
+                className="h-8 rounded-lg border border-input bg-background px-2.5 text-xs font-semibold shadow-xs"
+                value={flexGroupBy}
+                onChange={(e) => handleUpdateFlexGrouping(e.target.value as FlexItemGroupBy)}
+              >
+                <option value="zone_then_category">📍 โซน ➔ 🏷️ หมวดหมู่ (ใกล้กัน)</option>
+                <option value="category">🏷️ ตามหมวดหมู่สินค้า</option>
+                <option value="zone">📍 ตามโซนจัดวางสินค้า</option>
+                <option value="none">📄 ตามลำดับเดิม</option>
+              </select>
+              <Badge
+                variant="outline"
+                className="text-[10px] border-emerald-500/40 text-emerald-700 dark:text-emerald-300 shrink-0"
+              >
+                อัปเดตทันที
+              </Badge>
+            </div>
+          </div>
 
           <div className="py-1">
             <FlexMessageVisualizer

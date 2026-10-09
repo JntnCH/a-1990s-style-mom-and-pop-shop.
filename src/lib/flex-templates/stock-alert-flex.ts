@@ -4,19 +4,31 @@
  */
 
 import { DEFAULT_STORE_NAME, getSystemStoreName } from "./index";
+import {
+  type FlexItemGroupBy,
+  groupAndSortFlexItems,
+  type ItemWithCategoryAndZone,
+} from "./flex-grouper";
 
-export interface FlexStockAlertItem {
+export interface FlexStockAlertItem extends ItemWithCategoryAndZone {
   name: string;
   stock: number;
   minStock: number;
   unitName: string;
   status: "OUT_OF_STOCK" | "LOW_STOCK";
+  categoryId?: string;
+  categoryName?: string;
+  zoneId?: string;
+  zoneName?: string;
+  barcode?: string;
 }
 
 export interface StockAlertFlexOptions {
   storeName?: string;
   title?: string;
   themeColor?: string;
+  groupBy?: FlexItemGroupBy;
+  showGroupHeaders?: boolean;
 }
 
 export function createStockAlertFlexBubble(
@@ -37,33 +49,80 @@ export function createStockAlertFlexBubble(
   const title = options.title || "แจ้งเตือนสต็อกสินค้าต้องสั่งซื้อ";
   const headerBg = "#ef4444"; // Red for alert
 
-  const itemRows = items.map((item, index) => {
-    const isOut = item.status === "OUT_OF_STOCK" || item.stock <= 0;
-    return {
-      type: "box" as const,
-      layout: "horizontal" as const,
-      spacing: "sm" as const,
-      contents: [
-        {
-          type: "text" as const,
-          text: `${index + 1}. ${item.name}`,
-          size: "sm" as const,
-          color: "#1f2937",
-          flex: 6,
-          wrap: true,
-        },
-        {
-          type: "text" as const,
-          text: isOut ? "สินค้าหมด (0)" : `เหลือ ${item.stock} ${item.unitName}`,
-          size: "sm" as const,
-          color: isOut ? "#dc2626" : "#d97706",
-          weight: "bold" as const,
-          align: "end" as const,
-          flex: 4,
-        },
-      ],
-    };
+  const groupBy = options.groupBy || "zone_then_category";
+  const showGroupHeaders = options.showGroupHeaders !== false;
+
+  // Group and sort alert items so products in the same category or zone are adjacent
+  const groupedList = groupAndSortFlexItems(items, groupBy);
+
+  const itemRows: Record<string, unknown>[] = [];
+  let globalIndex = 0;
+
+  groupedList.forEach((grp, grpIdx) => {
+    // Add red-tinted group header for alert items
+    if (showGroupHeaders && grp.headerTitle && groupBy !== "none") {
+      itemRows.push({
+        type: "box",
+        layout: "horizontal",
+        backgroundColor: "#fef2f2",
+        paddingAll: "sm",
+        cornerRadius: "md",
+        margin: grpIdx === 0 ? "xs" : "md",
+        contents: [
+          {
+            type: "text",
+            text: grp.headerTitle,
+            size: "xs",
+            color: "#991b1b",
+            weight: "bold",
+            wrap: true,
+            flex: 8,
+          },
+          {
+            type: "text",
+            text: `${grp.items.length} รายการ`,
+            size: "xxs",
+            color: "#dc2626",
+            align: "end",
+            weight: "bold",
+            flex: 4,
+          },
+        ],
+      });
+    }
+
+    grp.items.forEach(({ item }) => {
+      globalIndex++;
+      const isOut = item.status === "OUT_OF_STOCK" || item.stock <= 0;
+      itemRows.push({
+        type: "box",
+        layout: "horizontal",
+        spacing: "sm",
+        margin: "xs",
+        contents: [
+          {
+            type: "text",
+            text: `${globalIndex}. ${item.name}`,
+            size: "sm",
+            color: "#1f2937",
+            flex: 6,
+            wrap: true,
+          },
+          {
+            type: "text",
+            text: isOut ? "สินค้าหมด (0)" : `เหลือ ${item.stock} ${item.unitName}`,
+            size: "sm",
+            color: isOut ? "#dc2626" : "#d97706",
+            weight: "bold",
+            align: "end",
+            flex: 4,
+            wrap: true,
+          },
+        ],
+      });
+    });
   });
+
 
   return {
     type: "flex" as const,

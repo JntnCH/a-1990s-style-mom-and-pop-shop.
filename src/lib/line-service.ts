@@ -4,14 +4,19 @@
  * Strictly adheres to Zero-Secret-Leakage: All keys come from Environment Injection.
  */
 
-import type { ProductItem } from "./store";
+import { MasterStore, type ProductItem } from "./store";
 import {
   createDailySummaryFlexBubble,
   createPurchaseOrderFlexBubble,
   createStockAlertFlexBubble,
   DEFAULT_STORE_NAME,
+  type FlexItemGroupBy,
+  type FlexOrderItem,
   type FlexStockAlertItem,
   getSystemStoreName,
+  groupAndSortFlexItems,
+  type PurchaseOrderFlexOptions,
+  type StockAlertFlexOptions,
 } from "./flex-templates";
 import { getLineServerConfigFn, sendLineMessagingApiFn } from "./line-server-fn";
 
@@ -215,20 +220,31 @@ export async function getLineStatus(): Promise<LineConfigStatus> {
 
 /**
  * Generates LINE Flex Message payload for Daily Purchase Order.
- * Specifications: รายการ -> จำนวน -> หน่วยนับ
+ * Specifications: จัดกลุ่มหมวดหมู่/โซน -> รายการ -> จำนวน -> หน่วยนับ
  */
 export function buildOrderFlexMessage(
   orders: LineOrderItem[],
   note: string = "ใบสั่งซื้อสินค้าประจำวัน",
   storeName: string = DEFAULT_STORE_NAME,
+  options?: Partial<PurchaseOrderFlexOptions>,
 ) {
-  const items = orders.map((o) => ({
-    name: o.product.name,
-    quantity: o.quantity,
-    unitName: o.unitName,
-    costPrice: o.product.costPrice,
-    barcode: o.product.barcode,
-  }));
+  const items: FlexOrderItem[] = orders.map((o) => {
+    const catName = o.product.categoryId
+      ? MasterStore.getCategoryName(o.product.categoryId)
+      : undefined;
+    const zName = o.product.zoneId ? MasterStore.getZoneName(o.product.zoneId) : undefined;
+    return {
+      name: o.product.name,
+      quantity: o.quantity,
+      unitName: o.unitName,
+      costPrice: o.product.costPrice,
+      barcode: o.product.barcode,
+      categoryId: o.product.categoryId,
+      categoryName: catName,
+      zoneId: o.product.zoneId,
+      zoneName: zName,
+    };
+  });
 
   const liffId = getClientLiffId() || undefined;
   const resolvedStoreName = getSystemStoreName(storeName);
@@ -237,15 +253,19 @@ export function buildOrderFlexMessage(
     storeName: resolvedStoreName,
     note,
     liffId,
+    groupBy: options?.groupBy || "zone_then_category",
+    showGroupHeaders: options?.showGroupHeaders,
+    ...options,
   });
 }
 
 /**
- * Creates plain text fallback for web share intent
+ * Creates plain text fallback for web share intent, grouped by Category/Zone
  */
 export function buildOrderPlainText(
   orders: LineOrderItem[],
   storeName: string = DEFAULT_STORE_NAME,
+  groupBy: FlexItemGroupBy = "zone_then_category",
 ): string {
   const resolvedStoreName = getSystemStoreName(storeName);
   const now = new Date();
@@ -255,17 +275,45 @@ export function buildOrderPlainText(
   let text = `📦 ใบสั่งซื้อสินค้าประจำวัน — ${resolvedStoreName}\n`;
   text += `📅 วันที่: ${dateStr} เวลา ${timeStr} น.\n`;
   text += `────────────────────\n`;
-  text += `รายการสินค้า (รายการ -> จำนวน -> หน่วยนับ):\n`;
+  text += `รายการสินค้า (จัดกลุ่มตามหมวดหมู่/โซน):\n\n`;
 
-  orders.forEach((item, index) => {
-    text += `${index + 1}. ${item.product.name} ➔ ${item.quantity} ${item.unitName}\n`;
+  const itemsForGrouping = orders.map((o) => {
+    const catName = o.product.categoryId
+      ? MasterStore.getCategoryName(o.product.categoryId)
+      : undefined;
+    const zName = o.product.zoneId ? MasterStore.getZoneName(o.product.zoneId) : undefined;
+    return {
+      name: o.product.name,
+      quantity: o.quantity,
+      unitName: o.unitName,
+      costPrice: o.product.costPrice,
+      barcode: o.product.barcode,
+      categoryId: o.product.categoryId,
+      categoryName: catName,
+      zoneId: o.product.zoneId,
+      zoneName: zName,
+    };
+  });
+
+  const grouped = groupAndSortFlexItems(itemsForGrouping, groupBy);
+  let counter = 0;
+
+  grouped.forEach((grp) => {
+    if (grp.headerTitle && groupBy !== "none") {
+      text += `📍 ${grp.headerTitle} (${grp.items.length} รายการ)\n`;
+    }
+    grp.items.forEach(({ item }) => {
+      counter++;
+      text += `  ${counter}. ${item.name} ➔ ${item.quantity} ${item.unitName}\n`;
+    });
+    text += `\n`;
   });
 
   const totalItems = orders.reduce((sum, o) => sum + o.quantity, 0);
   const totalCost = orders.reduce((sum, o) => sum + o.quantity * (o.product.costPrice || 0), 0);
 
   text += `────────────────────\n`;
-  text += `รวมสินค้า: ${totalItems} หน่วย\n`;
+  text += `รวมสินค้าทั้งหมด: ${totalItems} หน่วย (${orders.length} รายการ)\n`;
   text += `ประมาณการค่าใช้จ่าย: ฿${totalCost.toLocaleString("th-TH", { minimumFractionDigits: 2 })}\n`;
   text += `ส่งจากระบบ ${resolvedStoreName}`;
 
@@ -593,12 +641,17 @@ export interface OrderFlexItem {
   barcode?: string;
   costPrice?: number;
   priceEstimate?: number;
+  categoryId?: string;
+  categoryName?: string;
+  zoneId?: string;
+  zoneName?: string;
 }
 
 export function formatDailyOrderFlexMessage(
   items: OrderFlexItem[],
   dateStr?: string,
   storeName: string = DEFAULT_STORE_NAME,
+  options?: Partial<PurchaseOrderFlexOptions>,
 ) {
   const resolvedStoreName = getSystemStoreName(storeName);
   const nowStr = new Date().toISOString();
@@ -608,8 +661,8 @@ export function formatDailyOrderFlexMessage(
       barcode: i.barcode || "",
       codeType: "Barcode",
       name: i.name,
-      categoryId: "",
-      zoneId: "",
+      categoryId: i.categoryId || "",
+      zoneId: i.zoneId || "",
       unitId: "",
       costPrice: i.costPrice ?? (i.priceEstimate && i.quantity ? i.priceEstimate / i.quantity : 0),
       sellPrice: 0,
@@ -625,6 +678,7 @@ export function formatDailyOrderFlexMessage(
     lineOrders,
     `ใบสั่งซื้อประจำวัน (${dateStr || "วันนี้"})`,
     resolvedStoreName,
+    options,
   );
 }
 
@@ -632,6 +686,7 @@ export function formatOrderPlainText(
   items: OrderFlexItem[],
   dateStr?: string,
   storeName: string = DEFAULT_STORE_NAME,
+  groupBy: FlexItemGroupBy = "zone_then_category",
 ): string {
   const resolvedStoreName = getSystemStoreName(storeName);
   const nowStr = new Date().toISOString();
@@ -641,8 +696,8 @@ export function formatOrderPlainText(
       barcode: i.barcode || "",
       codeType: "Barcode",
       name: i.name,
-      categoryId: "",
-      zoneId: "",
+      categoryId: i.categoryId || "",
+      zoneId: i.zoneId || "",
       unitId: "",
       costPrice: i.costPrice ?? (i.priceEstimate && i.quantity ? i.priceEstimate / i.quantity : 0),
       sellPrice: 0,
@@ -654,7 +709,7 @@ export function formatOrderPlainText(
     quantity: i.quantity,
     unitName: i.unitName,
   }));
-  return buildOrderPlainText(lineOrders, resolvedStoreName);
+  return buildOrderPlainText(lineOrders, resolvedStoreName, groupBy);
 }
 
 export async function sendDailyOrderToLine(
@@ -662,6 +717,7 @@ export async function sendDailyOrderToLine(
   target: LineShareTarget = "group",
   dateStr?: string,
   storeName: string = DEFAULT_STORE_NAME,
+  options?: Partial<PurchaseOrderFlexOptions>,
 ): Promise<{ success: boolean; method?: string; error?: string }> {
   const resolvedStoreName = getSystemStoreName(storeName);
   const nowStr = new Date().toISOString();
@@ -671,8 +727,8 @@ export async function sendDailyOrderToLine(
       barcode: i.barcode || "",
       codeType: "Barcode",
       name: i.name,
-      categoryId: "",
-      zoneId: "",
+      categoryId: i.categoryId || "",
+      zoneId: i.zoneId || "",
       unitId: "",
       costPrice: i.priceEstimate && i.quantity ? i.priceEstimate / i.quantity : 0,
       sellPrice: 0,
@@ -685,7 +741,24 @@ export async function sendDailyOrderToLine(
     unitName: i.unitName,
   }));
 
-  const res = await sendOrderToLine(lineOrders, target, resolvedStoreName);
+  const flex = buildOrderFlexMessage(
+    lineOrders,
+    `ใบสั่งซื้อประจำวัน (${dateStr || "วันนี้"})`,
+    resolvedStoreName,
+    options,
+  );
+  const plain = buildOrderPlainText(
+    lineOrders,
+    resolvedStoreName,
+    options?.groupBy || "zone_then_category",
+  );
+
+  const res = await sendWith3TierFallback({
+    summary: plain,
+    flexMessage: flex,
+    target,
+  });
+
   const result: { success: boolean; method?: string; error?: string } = {
     success: res.success,
     method: res.channel === "liff_picker" ? "share_target_picker" : "web_intent",
@@ -700,16 +773,29 @@ export async function sendStockAlertToLine(
   alertItems: FlexStockAlertItem[],
   target: LineShareTarget = "group",
   storeName: string = DEFAULT_STORE_NAME,
+  options?: Partial<StockAlertFlexOptions>,
 ): Promise<{ success: boolean; method?: string; error?: string; tier?: number }> {
   const resolvedStoreName = getSystemStoreName(storeName);
-  const flexMsg = createStockAlertFlexBubble(alertItems, { storeName: resolvedStoreName });
+  const flexMsg = createStockAlertFlexBubble(alertItems, {
+    storeName: resolvedStoreName,
+    ...options,
+  });
 
+  const grouped = groupAndSortFlexItems(alertItems, options?.groupBy || "zone_then_category");
   let text = `⚠️ แจ้งเตือนสต็อกสินค้าต้องสั่งซื้อ — ${resolvedStoreName}\n`;
   text += `────────────────────\n`;
-  alertItems.forEach((item, index) => {
-    const statusText =
-      item.status === "OUT_OF_STOCK" ? "สินค้าหมด (0)" : `เหลือ ${item.stock} ${item.unitName}`;
-    text += `${index + 1}. ${item.name} ➔ ${statusText}\n`;
+  let counter = 0;
+  grouped.forEach((grp) => {
+    if (grp.headerTitle && options?.groupBy !== "none") {
+      text += `📍 ${grp.headerTitle} (${grp.items.length} รายการ)\n`;
+    }
+    grp.items.forEach(({ item }) => {
+      counter++;
+      const statusText =
+        item.status === "OUT_OF_STOCK" ? "สินค้าหมด (0)" : `เหลือ ${item.stock} ${item.unitName}`;
+      text += `  ${counter}. ${item.name} ➔ ${statusText}\n`;
+    });
+    text += `\n`;
   });
   text += `────────────────────\nกรุณาเข้าสู่ระบบ ${resolvedStoreName} เพื่อตรวจสอบสต็อก`;
 

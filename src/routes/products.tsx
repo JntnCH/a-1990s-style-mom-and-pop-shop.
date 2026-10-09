@@ -503,8 +503,8 @@ function ProductsPage() {
                 <Button
                   type="button"
                   size="sm"
-                  variant={searchScannerActive ? "default" : "secondary"}
-                  className="h-8 px-2.5 text-xs font-semibold gap-1.5 rounded-lg shadow-xs"
+                  variant={searchScannerActive ? "destructive" : "secondary"}
+                  className="h-9 px-3 text-xs font-semibold gap-1.5 rounded-xl shadow-xs active:scale-98"
                   onClick={() => {
                     if (searchScannerActive) {
                       stopSearchScanner();
@@ -515,7 +515,7 @@ function ProductsPage() {
                     }
                   }}
                 >
-                  <Camera className="size-3.5" />
+                  <Camera className="size-4" />
                   {searchScannerActive ? "ปิดกล้อง" : "สแกน"}
                 </Button>
               </div>

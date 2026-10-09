@@ -311,7 +311,7 @@ function ScanPage() {
                     <Button
                       size="lg"
                       variant="secondary"
-                      className="flex-1 gap-2 rounded-xl h-11"
+                      className="flex-1 gap-2 rounded-xl h-12 sm:h-13 font-bold text-sm sm:text-base active:scale-98"
                       onClick={stop}
                     >
                       <CameraOff className="size-5" /> ปิดกล้องสแกนเนอร์
@@ -321,7 +321,7 @@ function ScanPage() {
                         size="lg"
                         type="button"
                         variant={isTorchOn ? "default" : "outline"}
-                        className={`h-11 px-4 rounded-xl font-semibold transition-all ${
+                        className={`h-12 sm:h-13 px-4 rounded-xl font-semibold transition-all active:scale-98 ${
                           isTorchOn
                             ? "bg-amber-500 hover:bg-amber-600 text-white shadow-amber-500/20"
                             : ""
@@ -340,7 +340,7 @@ function ScanPage() {
                 ) : (
                   <Button
                     size="lg"
-                    className="w-full gap-2 rounded-xl h-11 font-semibold shadow-sm bg-primary text-primary-foreground"
+                    className="w-full gap-2 rounded-xl h-12 sm:h-13 font-bold text-sm sm:text-base shadow-sm bg-primary hover:bg-primary/95 text-primary-foreground active:scale-98"
                     onClick={() => void start()}
                   >
                     <Camera className="size-5" /> เปิดกล้องเพื่อสแกน (ความเร็วสูง)

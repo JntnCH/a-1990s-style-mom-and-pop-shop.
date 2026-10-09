@@ -7,7 +7,10 @@ import {
   type UnitItem,
   type PurchaseOrderRecord,
   type StockMovementLog,
+  type ReceiveItem,
+  type LineUserFollower,
 } from "@/lib/store";
+import { syncMasterDatabaseFn } from "@/lib/line-server-fn";
 
 /**
  * Custom hook to subscribe to real-time changes in MasterStore
@@ -19,6 +22,51 @@ export function useRealtimeStore() {
   const refresh = useCallback(() => {
     setVersion((v) => v + 1);
   }, []);
+
+  const syncWithDatabase = useCallback(async () => {
+    try {
+      const res = await syncMasterDatabaseFn({
+        data: {
+          products: MasterStore.getProducts(),
+          categories: MasterStore.getCategories(),
+          zones: MasterStore.getZones(),
+          units: MasterStore.getUnits(),
+          receives: MasterStore.getReceives(),
+          followers: MasterStore.getFollowers(),
+          movements: MasterStore.getMovements(),
+          purchaseOrders: MasterStore.getPurchaseOrders(),
+        },
+      });
+      if (res?.success && res.data) {
+        if (Array.isArray(res.data.units) && res.data.units.length > 0) {
+          MasterStore.saveUnits(res.data.units as UnitItem[]);
+        }
+        if (Array.isArray(res.data.categories) && res.data.categories.length > 0) {
+          MasterStore.saveCategories(res.data.categories as CategoryItem[]);
+        }
+        if (Array.isArray(res.data.zones) && res.data.zones.length > 0) {
+          MasterStore.saveZones(res.data.zones as ZoneItem[]);
+        }
+        if (Array.isArray(res.data.products) && res.data.products.length > 0) {
+          MasterStore.saveProducts(res.data.products as ProductItem[]);
+        }
+        if (Array.isArray(res.data.followers) && res.data.followers.length > 0) {
+          MasterStore.saveFollowers(res.data.followers as LineUserFollower[]);
+        }
+        if (Array.isArray(res.data.movements) && res.data.movements.length > 0) {
+          MasterStore.saveMovements(res.data.movements as StockMovementLog[]);
+        }
+        if (Array.isArray(res.data.purchaseOrders) && res.data.purchaseOrders.length > 0) {
+          MasterStore.savePurchaseOrders(res.data.purchaseOrders as PurchaseOrderRecord[]);
+        }
+        refresh();
+      }
+      return res;
+    } catch (err) {
+      console.warn("DB sync notice:", err);
+      return null;
+    }
+  }, [refresh]);
 
   useEffect(() => {
     const handleStoreChange = () => {
@@ -37,6 +85,7 @@ export function useRealtimeStore() {
   return {
     version,
     refresh,
+    syncWithDatabase,
     getProducts: useCallback(() => MasterStore.getProducts(), [version]),
     getZones: useCallback(() => MasterStore.getZones(), [version]),
     getCategories: useCallback(() => MasterStore.getCategories(), [version]),
