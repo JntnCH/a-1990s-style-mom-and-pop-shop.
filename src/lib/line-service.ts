@@ -253,19 +253,20 @@ export function buildOrderFlexMessage(
     storeName: resolvedStoreName,
     note,
     liffId,
-    groupBy: options?.groupBy || "zone_then_category",
+    groupBy: options?.groupBy || "category",
     showGroupHeaders: options?.showGroupHeaders,
+    includeZone: options?.includeZone ?? false,
     ...options,
   });
 }
 
 /**
- * Creates plain text fallback for web share intent, grouped by Category/Zone
+ * Creates plain text fallback for web share intent, grouped by Category
  */
 export function buildOrderPlainText(
   orders: LineOrderItem[],
   storeName: string = DEFAULT_STORE_NAME,
-  groupBy: FlexItemGroupBy = "zone_then_category",
+  groupBy: FlexItemGroupBy = "category",
 ): string {
   const resolvedStoreName = getSystemStoreName(storeName);
   const now = new Date();
@@ -275,7 +276,7 @@ export function buildOrderPlainText(
   let text = `📦 ใบสั่งซื้อสินค้าประจำวัน — ${resolvedStoreName}\n`;
   text += `📅 วันที่: ${dateStr} เวลา ${timeStr} น.\n`;
   text += `────────────────────\n`;
-  text += `รายการสินค้า (จัดกลุ่มตามหมวดหมู่/โซน):\n\n`;
+  text += `รายการสินค้า (จัดกลุ่มตามหมวดหมู่):\n\n`;
 
   const itemsForGrouping = orders.map((o) => {
     const catName = o.product.categoryId
@@ -295,12 +296,12 @@ export function buildOrderPlainText(
     };
   });
 
-  const grouped = groupAndSortFlexItems(itemsForGrouping, groupBy);
+  const grouped = groupAndSortFlexItems(itemsForGrouping, { groupBy, includeZone: false });
   let counter = 0;
 
   grouped.forEach((grp) => {
     if (grp.headerTitle && groupBy !== "none") {
-      text += `📍 ${grp.headerTitle} (${grp.items.length} รายการ)\n`;
+      text += `${grp.headerTitle} (${grp.items.length} รายการ)\n`;
     }
     grp.items.forEach(({ item }) => {
       counter++;

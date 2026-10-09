@@ -25,6 +25,11 @@ export interface GroupedFlexItems<T extends ItemWithCategoryAndZone> {
   items: { item: T; originalIndex: number }[];
 }
 
+export interface GroupFlexItemsOptions {
+  groupBy?: FlexItemGroupBy;
+  includeZone?: boolean;
+}
+
 /**
  * Resolves category name and zone name for an item using item properties or MasterStore lookup
  */
@@ -37,7 +42,13 @@ export function resolveItemMetadata<T extends ItemWithCategoryAndZone>(
   // If missing, look up from MasterStore by categoryId / zoneId
   if (!catName && item.categoryId) {
     catName = MasterStore.getCategoryName(item.categoryId);
+  } else if (catName) {
+    const lookedUp = MasterStore.getCategoryName(catName);
+    if (lookedUp && lookedUp !== "ทั่วไป" && lookedUp !== catName) {
+      catName = lookedUp;
+    }
   }
+
   if (!zName && item.zoneId) {
     zName = MasterStore.getZoneName(item.zoneId);
   }
@@ -68,12 +79,32 @@ export function resolveItemMetadata<T extends ItemWithCategoryAndZone>(
 
 /**
  * Groups and sorts items so products belonging to the same category or zone are adjacent.
+ * ค่าเริ่มต้น: จัดกลุ่มตามหมวดหมู่ (category) และไม่แสดงโซนใน Flex Message
  */
 export function groupAndSortFlexItems<T extends ItemWithCategoryAndZone>(
   items: T[],
-  groupBy: FlexItemGroupBy = "zone_then_category",
+  groupByOrOptions: FlexItemGroupBy | GroupFlexItemsOptions = "category",
 ): GroupedFlexItems<T>[] {
   if (!items || items.length === 0) return [];
+
+  const rawGroupBy: FlexItemGroupBy =
+    typeof groupByOrOptions === "string"
+      ? groupByOrOptions
+      : groupByOrOptions?.groupBy || "category";
+
+  const includeZone: boolean =
+    typeof groupByOrOptions === "object" && typeof groupByOrOptions.includeZone === "boolean"
+      ? groupByOrOptions.includeZone
+      : false;
+
+  // หากไม่ต้องการโซนใน Flex Message ให้จัดกลุ่มตามหมวดหมู่อย่างเดียว
+  const groupBy: FlexItemGroupBy =
+    !includeZone &&
+    (rawGroupBy === "zone_then_category" ||
+      rawGroupBy === "category_then_zone" ||
+      rawGroupBy === "zone")
+      ? "category"
+      : rawGroupBy;
 
   if (groupBy === "none") {
     return [
@@ -140,20 +171,20 @@ export function groupAndSortFlexItems<T extends ItemWithCategoryAndZone>(
 
     switch (groupBy) {
       case "zone_then_category":
-        groupKey = `${zoneName}:::${categoryName}`;
-        headerTitle = `📍 ${zoneName} • 🏷️ ${categoryName}`;
+        groupKey = includeZone ? `${zoneName}:::${categoryName}` : categoryName;
+        headerTitle = includeZone ? `📍 ${zoneName} • 🏷️ ${categoryName}` : `🏷️ ${categoryName}`;
         break;
       case "category_then_zone":
-        groupKey = `${categoryName}:::${zoneName}`;
-        headerTitle = `🏷️ ${categoryName} • 📍 ${zoneName}`;
+        groupKey = includeZone ? `${categoryName}:::${zoneName}` : categoryName;
+        headerTitle = includeZone ? `🏷️ ${categoryName} • 📍 ${zoneName}` : `🏷️ ${categoryName}`;
         break;
       case "zone":
-        groupKey = zoneName;
-        headerTitle = `📍 โซน: ${zoneName}`;
+        groupKey = includeZone ? zoneName : categoryName;
+        headerTitle = includeZone ? `📍 โซน: ${zoneName}` : `🏷️ ${categoryName}`;
         break;
       case "category":
         groupKey = categoryName;
-        headerTitle = `🏷️ หมวดหมู่: ${categoryName}`;
+        headerTitle = `🏷️ ${categoryName}`;
         break;
     }
 

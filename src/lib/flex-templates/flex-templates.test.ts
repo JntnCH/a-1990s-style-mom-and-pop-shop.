@@ -125,6 +125,50 @@ describe("Flex Message Template Customization (Separated Qty/Unit & Large Font)"
     expect(tableHeader.contents[0].size).toBe("xs");
   });
 
+  it("does not include zone in the Flex Message headers by default", () => {
+    const flex = createPurchaseOrderFlexBubble([
+      {
+        name: "ช้างขวด",
+        quantity: 20,
+        unitName: "ขวด",
+        categoryName: "เครื่องดื่ม",
+        zoneName: "ตู้แช่ เครื่องดื่ม",
+      },
+      {
+        name: "40 ดีกรี กลาง",
+        quantity: 20,
+        unitName: "ลัง",
+        categoryName: "เหล้า",
+        zoneName: "หน้าร้าน/เคาน์เตอร์",
+      },
+    ]);
+
+    const bodyContents = flex.contents.body.contents;
+    const itemsBox = bodyContents[2] as {
+      contents: Array<{
+        type: string;
+        layout?: string;
+        contents: Array<{ text: string; size?: string }>;
+      }>;
+    };
+
+    // Find group header banners (they have 2 items: title and count)
+    const headerBanners = itemsBox.contents.filter(
+      (c) => c.contents && c.contents.length === 2 && c.contents[0].text.startsWith("🏷️"),
+    );
+
+    expect(headerBanners.length).toBeGreaterThan(0);
+    headerBanners.forEach((banner) => {
+      const bannerText = banner.contents[0].text;
+      // Must NOT contain 📍 or zone names
+      expect(bannerText).not.toContain("📍");
+      expect(bannerText).not.toContain("ตู้แช่");
+      expect(bannerText).not.toContain("หน้าร้าน");
+      // Must contain category tag
+      expect(bannerText.startsWith("🏷️")).toBe(true);
+    });
+  });
+
   it("creates Daily Summary flex with large typography", () => {
     const flex = createDailySummaryFlexBubble({
       totalProducts: 50,

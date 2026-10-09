@@ -39,12 +39,13 @@ export interface PurchaseOrderFlexOptions {
   showGroupHeaders?: boolean;
   fontSize?: "large" | "medium";
   separateQuantityUnit?: boolean;
+  includeZone?: boolean;
 }
 
 /**
  * สร้าง Flex Message Bubble สำหรับใบสั่งซื้อสินค้าประจำวัน
  * รูปแบบแสดงผล: แยกคอลัมน์ [รายการ] [จำนวน] [หน่วยนับ] ออกจากกันชัดเจน พร้อมข้อความขนาดใหญ่
- * จัดกลุ่มตามโซน/หมวดหมู่ พร้อมยอดรวมและมูลค่าโดยประมาณ
+ * จัดกลุ่มตามหมวดหมู่ (ไม่แสดงโซน) พร้อมยอดรวมและมูลค่าโดยประมาณ
  * พร้อมปุ่มลัดสำหรับเปิดหน้าแดชบอร์ดหลัก และเปิดดูใบสั่งซื้อ
  */
 export function createPurchaseOrderFlexBubble(
@@ -54,6 +55,7 @@ export function createPurchaseOrderFlexBubble(
   const storeName = getSystemStoreName(options.storeName);
   const isLargeFont = options.fontSize !== "medium";
   const separateQuantityUnit = options.separateQuantityUnit !== false;
+  const includeZone = options.includeZone === true; // ค่าเริ่มต้น: ไม่ต้องการโซนใน Flex Message
 
   const now = new Date();
   const dateStr =
@@ -79,7 +81,7 @@ export function createPurchaseOrderFlexBubble(
   const dashboardUrl = `${baseUrl}`;
   const reorderUrl = `${baseUrl}/reorder`;
 
-  const groupBy = options.groupBy || "zone_then_category";
+  const groupBy = options.groupBy || "category";
   const showGroupHeaders = options.showGroupHeaders !== false;
 
   const totalQuantity = items.reduce((sum, o) => sum + (Number(o.quantity) || 0), 0);
@@ -88,8 +90,8 @@ export function createPurchaseOrderFlexBubble(
     0,
   );
 
-  // Group and sort items so products in the same category or zone are adjacent
-  const groupedList = groupAndSortFlexItems(items, groupBy);
+  // Group and sort items (omits zone by default)
+  const groupedList = groupAndSortFlexItems(items, { groupBy, includeZone });
 
   const itemRows: Record<string, unknown>[] = [];
   let globalIndex = 0;

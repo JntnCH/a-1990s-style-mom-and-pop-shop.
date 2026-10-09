@@ -31,6 +31,7 @@ export interface StockAlertFlexOptions {
   showGroupHeaders?: boolean;
   fontSize?: "large" | "medium";
   separateQuantityUnit?: boolean;
+  includeZone?: boolean;
 }
 
 export function createStockAlertFlexBubble(
@@ -39,6 +40,7 @@ export function createStockAlertFlexBubble(
 ) {
   const isLargeFont = options.fontSize !== "medium";
   const separateQuantityUnit = options.separateQuantityUnit !== false;
+  const includeZone = options.includeZone === true; // ค่าเริ่มต้น: ไม่ต้องการโซนใน Flex Message
 
   const now = new Date();
   const dateStr = now.toLocaleDateString("th-TH", {
@@ -54,11 +56,11 @@ export function createStockAlertFlexBubble(
   const title = options.title || "แจ้งเตือนสต็อกสินค้าต้องสั่งซื้อ";
   const headerBg = "#ef4444"; // Red for alert
 
-  const groupBy = options.groupBy || "zone_then_category";
+  const groupBy = options.groupBy || "category";
   const showGroupHeaders = options.showGroupHeaders !== false;
 
-  // Group and sort alert items so products in the same category or zone are adjacent
-  const groupedList = groupAndSortFlexItems(items, groupBy);
+  // Group and sort alert items (omits zone by default)
+  const groupedList = groupAndSortFlexItems(items, { groupBy, includeZone });
 
   const itemRows: Record<string, unknown>[] = [];
   let globalIndex = 0;

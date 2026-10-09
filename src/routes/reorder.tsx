@@ -288,7 +288,7 @@ function ReorderPage() {
   const [flexPreviewOpen, setFlexPreviewOpen] = useState(false);
   const [flexPreviewData, setFlexPreviewData] = useState<unknown>(null);
   const [flexPreviewTitle, setFlexPreviewTitle] = useState("ตัวอย่าง LINE Flex Message");
-  const [flexGroupBy, setFlexGroupBy] = useState<FlexItemGroupBy>("zone_then_category");
+  const [flexGroupBy, setFlexGroupBy] = useState<FlexItemGroupBy>("category");
   const [flexPreviewSource, setFlexPreviewSource] = useState<{
     type: "order" | "alert" | "po";
     orderItems?: FullOrderItem[];
@@ -2565,26 +2565,20 @@ function ReorderPage() {
                           const next = e.target.value as FlexItemGroupBy;
                           setFlexGroupBy(next);
                           toast.success(
-                            next === "zone_then_category"
-                              ? "จัดกลุ่มตามโซน ➔ หมวดหมู่ (โซนและหมวดเดียวกันอยู่ด้วยกัน)"
-                              : next === "category"
-                                ? "จัดกลุ่มตามหมวดหมู่สินค้า"
-                                : next === "zone"
-                                  ? "จัดกลุ่มตามโซนจัดวางสินค้า"
-                                  : "เรียงตามลำดับเดิม",
+                            next === "category"
+                              ? "จัดกลุ่มตามหมวดหมู่สินค้า (ไม่แสดงโซน)"
+                              : next === "none"
+                                ? "เรียงตามลำดับเดิม (ไม่มีแถบหัวข้อ)"
+                                : next === "zone_then_category"
+                                  ? "จัดกลุ่มตามโซน ➔ หมวดหมู่"
+                                  : "จัดกลุ่มตามโซนจัดวางสินค้า",
                           );
                         }}
                       >
-                        <option value="zone_then_category">
-                          📍 โซน ➔ 🏷️ หมวดหมู่ (แนะนำ: จัดวางใกล้กัน)
-                        </option>
-                        <option value="category">
-                          🏷️ ตามหมวดหมู่สินค้า (เช่น เครื่องดื่ม, ของแห้ง)
-                        </option>
-                        <option value="zone">
-                          📍 ตามโซนจัดวางสินค้า (เช่น โซน A หน้าร้าน, โซน C ตู้แช่)
-                        </option>
-                        <option value="none">📄 ตามลำดับเดิมที่เพิ่ม</option>
+                        <option value="category">🏷️ ตามหมวดหมู่สินค้า (ไม่แสดงโซน - แนะนำ)</option>
+                        <option value="none">📄 ตามลำดับเดิม (ไม่มีแถบหัวข้อ)</option>
+                        <option value="zone_then_category">📍 โซน ➔ 🏷️ หมวดหมู่</option>
+                        <option value="zone">📍 ตามโซนจัดวางสินค้า</option>
                       </select>
                       <p className="text-[10px] text-muted-foreground leading-relaxed">
                         จัดลำดับสินค้าในหมวดหมู่หรือโซนเดียวกันให้อยู่ติดกันใน LINE Flex
@@ -4675,10 +4669,10 @@ function ReorderPage() {
                 value={flexGroupBy}
                 onChange={(e) => handleUpdateFlexGrouping(e.target.value as FlexItemGroupBy)}
               >
-                <option value="zone_then_category">📍 โซน ➔ 🏷️ หมวดหมู่ (ใกล้กัน)</option>
-                <option value="category">🏷️ ตามหมวดหมู่สินค้า</option>
+                <option value="category">🏷️ ตามหมวดหมู่สินค้า (ไม่แสดงโซน - แนะนำ)</option>
+                <option value="none">📄 ตามลำดับเดิม (ไม่มีแถบหัวข้อ)</option>
+                <option value="zone_then_category">📍 โซน ➔ 🏷️ หมวดหมู่</option>
                 <option value="zone">📍 ตามโซนจัดวางสินค้า</option>
-                <option value="none">📄 ตามลำดับเดิม</option>
               </select>
               <Badge
                 variant="outline"

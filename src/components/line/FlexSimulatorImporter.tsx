@@ -52,18 +52,21 @@ export function FlexSimulatorImporter({ onSaved }: FlexSimulatorImporterProps) {
           name: "ปลาร้า แม่เหรียญ ฝาขาว 380 มล.",
           quantity: 1,
           unitName: "แพ็ค",
+          categoryName: "เครื่องปรุงรส",
           costPrice: 180,
         },
         {
           name: "ครีมเภสัช 45 ก.",
           quantity: 15,
           unitName: "ขวด",
+          categoryName: "ของใช้ส่วนตัว",
           costPrice: 25,
         },
         {
           name: "น้ำปลาทิพรส 700 มล.",
           quantity: 6,
           unitName: "ขวด",
+          categoryName: "เครื่องปรุงรส",
           costPrice: 32,
         },
       ],
@@ -71,6 +74,7 @@ export function FlexSimulatorImporter({ onSaved }: FlexSimulatorImporterProps) {
         storeName: currentStoreName,
         fontSize: large ? "large" : "medium",
         separateQuantityUnit: separate,
+        includeZone: false,
       },
     );
 
