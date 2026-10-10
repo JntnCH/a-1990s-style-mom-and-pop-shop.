@@ -291,7 +291,7 @@ export function FlexSimulatorImporter({ onSaved }: FlexSimulatorImporterProps) {
   };
 
   return (
-    <div className="space-y-4">
+    <div className="min-w-0 w-full space-y-4">
       {/* Top Banner & Instructions */}
       <div className="rounded-2xl border bg-gradient-to-r from-emerald-500/10 via-emerald-500/5 to-transparent p-4 sm:p-5">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -458,16 +458,16 @@ export function FlexSimulatorImporter({ onSaved }: FlexSimulatorImporterProps) {
       </div>
 
       {/* Editor & Live Preview Grid */}
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-2">
         {/* Left Column: JSON Input Textarea */}
-        <Card className="rounded-2xl border shadow-xs flex flex-col justify-between">
+        <Card className="min-w-0 w-full rounded-2xl border shadow-xs flex flex-col justify-between">
           <CardHeader className="p-4 pb-2 border-b">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
+            <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
+              <div className="flex min-w-0 items-center gap-2">
                 <Code2 className="size-4 text-primary" />
                 <CardTitle className="text-sm">กล่องวาง JSON (LINE Simulator)</CardTitle>
               </div>
-              <div className="flex items-center gap-1">
+              <div className="flex min-w-0 flex-wrap items-center justify-end gap-1">
                 <Button
                   size="sm"
                   variant="ghost"
@@ -497,16 +497,16 @@ export function FlexSimulatorImporter({ onSaved }: FlexSimulatorImporterProps) {
             </CardDescription>
           </CardHeader>
 
-          <CardContent className="p-4 space-y-3 flex-1 flex flex-col">
+          <CardContent className="min-w-0 p-4 space-y-3 flex-1 flex flex-col">
             <Textarea
               value={rawJson}
               onChange={(e) => handleJsonChange(e.target.value)}
               placeholder="วาง JSON ที่คัดลอกจาก LINE Flex Message Simulator ที่นี่..."
-              className="font-mono text-xs h-[420px] rounded-xl bg-muted/20 resize-none border-border/80 focus-visible:ring-primary leading-relaxed"
+              className="min-w-0 w-full max-w-full font-mono text-xs h-[420px] rounded-xl bg-muted/20 resize-none border-border/80 focus-visible:ring-primary leading-relaxed"
               spellCheck={false}
             />
 
-            <div className="flex items-center justify-between gap-2 pt-2 flex-wrap border-t">
+            <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t">
               <Button
                 size="sm"
                 variant="outline"
@@ -516,7 +516,7 @@ export function FlexSimulatorImporter({ onSaved }: FlexSimulatorImporterProps) {
                 <Trash2 className="size-3.5" /> คืนค่ามาตรฐาน
               </Button>
 
-              <div className="flex items-center gap-2">
+              <div className="flex min-w-0 flex-wrap items-center justify-end gap-2">
                 <Button
                   size="sm"
                   variant="outline"
@@ -542,13 +542,13 @@ export function FlexSimulatorImporter({ onSaved }: FlexSimulatorImporterProps) {
         </Card>
 
         {/* Right Column: Live Visual Preview */}
-        <div className="space-y-2">
-          <div className="flex items-center justify-between px-1">
-            <span className="text-xs font-bold text-foreground flex items-center gap-1.5">
+        <div className="min-w-0 space-y-2">
+          <div className="flex flex-col gap-2 px-1 sm:flex-row sm:items-center sm:justify-between">
+            <span className="min-w-0 text-xs font-bold text-foreground flex items-center gap-1.5">
               <MessageCircle className="size-4 text-[#06C755]" /> ตัวอย่างผลลัพธ์ในแอป LINE (Live
               Preview)
             </span>
-            <div className="flex items-center gap-1.5">
+            <div className="flex flex-wrap items-center gap-1.5">
               <Badge
                 variant="outline"
                 className="text-[10px] text-emerald-700 dark:text-emerald-300 border-emerald-500/30"
@@ -564,7 +564,7 @@ export function FlexSimulatorImporter({ onSaved }: FlexSimulatorImporterProps) {
           <FlexMessageVisualizer
             flexData={parsedFlex}
             title="ตัวอย่างการแสดงผล Flex Message"
-            className="rounded-2xl"
+            className="min-w-0 w-full rounded-2xl"
           />
         </div>
       </div>
