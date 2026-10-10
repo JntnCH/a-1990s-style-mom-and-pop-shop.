@@ -102,10 +102,10 @@ export function FlexMessageVisualizer({
 
   return (
     <div
-      className={`flex flex-col rounded-2xl border border-border/80 bg-card overflow-hidden shadow-sm ${className}`}
+      className={`flex min-w-0 w-full flex-col rounded-2xl border border-border/80 bg-card overflow-hidden shadow-sm ${className}`}
     >
       {/* Header Bar */}
-      <div className="flex items-center justify-between px-4 py-3 bg-muted/50 border-b border-border/60">
+      <div className="flex flex-col gap-2 px-3 py-3 bg-muted/50 border-b border-border/60 sm:flex-row sm:items-center sm:justify-between sm:px-4">
         <div className="flex items-center gap-2 min-w-0">
           <div className="size-7 rounded-lg bg-[#06C755] text-white flex items-center justify-center shrink-0">
             <MessageCircle className="size-4 fill-white" />
@@ -116,7 +116,7 @@ export function FlexMessageVisualizer({
           </div>
         </div>
 
-        <div className="flex items-center gap-1.5">
+        <div className="flex min-w-0 flex-wrap items-center justify-between gap-1.5 sm:justify-end">
           <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as typeof viewMode)}>
             <TabsList className="h-8 p-0.5 rounded-lg bg-muted">
               <TabsTrigger value="visual" className="h-7 text-xs px-2.5 rounded-md gap-1">
@@ -167,14 +167,14 @@ export function FlexMessageVisualizer({
           </div>
 
           {/* LINE Message Container with Avatar */}
-          <div className="flex items-start gap-2 max-w-full w-full justify-center">
+          <div className="flex min-w-0 items-start gap-2 max-w-full w-full justify-center">
             {/* Bot Avatar */}
             <div className="size-8 rounded-full bg-[#06C755] text-white flex items-center justify-center text-xs font-bold shrink-0 shadow-sm mt-0.5">
               MM
             </div>
 
             {/* Bubble Card */}
-            <div className="w-full max-w-[390px] sm:max-w-[450px] rounded-2xl overflow-hidden shadow-lg bg-white text-zinc-900 border border-black/10">
+            <div className="min-w-0 w-full max-w-[390px] flex-1 sm:max-w-[450px] rounded-2xl overflow-hidden shadow-lg bg-white text-zinc-900 border border-black/10">
               {/* Header Box */}
               {bubble?.header && (
                 <div
