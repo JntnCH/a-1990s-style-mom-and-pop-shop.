@@ -876,7 +876,7 @@ function ScanPage() {
                     <div className="space-y-0.5">
                       <div className="font-semibold">
                         {inspection.isValid ? "รหัสถูกต้องตามมาตรฐาน" : "รหัสไม่ถูกต้อง"} (
-                        {inspection.detectedFormat})
+                        {inspection.inferredFormat})
                       </div>
                       <div className="text-[11px] opacity-90 mt-0.5">{inspection.notes}</div>
                     </div>

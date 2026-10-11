@@ -134,7 +134,7 @@ export const BackupService = {
       printJobsCount: printJobs.length,
       usersCount: users.length,
       approxStorageKb,
-      lastBackupDate,
+      ...(lastBackupDate !== undefined ? { lastBackupDate } : {}),
     };
   },
 
@@ -455,7 +455,10 @@ export const BackupService = {
     localStorage.setItem("minimark_receipt_config_v1", JSON.stringify(DEFAULT_RECEIPT_CONFIG));
     localStorage.setItem("minimark_print_jobs_v1", JSON.stringify(DEFAULT_PRINT_JOBS));
     localStorage.setItem("minimark_rbac_users_v1", JSON.stringify(DEFAULT_USERS));
-    localStorage.setItem("minimark_rbac_current_user_v1", DEFAULT_USERS[0].id);
+    const defaultAdmin = DEFAULT_USERS.find((user) => user.role === "ADMIN");
+    if (defaultAdmin) {
+      localStorage.setItem("minimark_rbac_current_user_v1", defaultAdmin.id);
+    }
 
     window.dispatchEvent(new Event("minimark_store_change"));
     window.dispatchEvent(new Event("minimark_printers_change"));

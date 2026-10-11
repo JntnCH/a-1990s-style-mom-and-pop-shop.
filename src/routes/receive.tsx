@@ -204,7 +204,7 @@ function ReceiveCheckPage() {
         // New Item in checklist
         const newItem: ReceiveCheckItem = {
           id: `scan-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
-          productId: matchedProduct?.id,
+          ...(matchedProduct ? { productId: matchedProduct.id } : {}),
           barcode: trimmed,
           format: format || matchedProduct?.format,
           codeType: type || (trimmed.toUpperCase().startsWith("QR") ? "QR" : "Barcode"),

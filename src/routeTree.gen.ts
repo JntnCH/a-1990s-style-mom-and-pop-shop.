@@ -10,6 +10,8 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AnalyticsRouteImport } from './routes/analytics'
+import { Route as DocumentsRouteImport } from './routes/documents'
 import { Route as HistoryRouteImport } from './routes/history'
 import { Route as IssueRouteImport } from './routes/issue'
 import { Route as PrintersRouteImport } from './routes/printers'
@@ -23,6 +25,16 @@ import { Route as StockRouteImport } from './routes/stock'
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AnalyticsRoute = AnalyticsRouteImport.update({
+  id: '/analytics',
+  path: '/analytics',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DocumentsRoute = DocumentsRouteImport.update({
+  id: '/documents',
+  path: '/documents',
   getParentRoute: () => rootRouteImport,
 } as any)
 const HistoryRoute = HistoryRouteImport.update({
@@ -73,6 +85,8 @@ const StockRoute = StockRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/analytics': typeof AnalyticsRoute
+  '/documents': typeof DocumentsRoute
   '/history': typeof HistoryRoute
   '/issue': typeof IssueRoute
   '/printers': typeof PrintersRoute
@@ -85,6 +99,8 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/analytics': typeof AnalyticsRoute
+  '/documents': typeof DocumentsRoute
   '/history': typeof HistoryRoute
   '/issue': typeof IssueRoute
   '/printers': typeof PrintersRoute
@@ -98,6 +114,8 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/analytics': typeof AnalyticsRoute
+  '/documents': typeof DocumentsRoute
   '/history': typeof HistoryRoute
   '/issue': typeof IssueRoute
   '/printers': typeof PrintersRoute
@@ -112,6 +130,8 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/analytics'
+    | '/documents'
     | '/history'
     | '/issue'
     | '/printers'
@@ -124,6 +144,8 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/analytics'
+    | '/documents'
     | '/history'
     | '/issue'
     | '/printers'
@@ -136,6 +158,8 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/analytics'
+    | '/documents'
     | '/history'
     | '/issue'
     | '/printers'
@@ -149,6 +173,8 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AnalyticsRoute: typeof AnalyticsRoute
+  DocumentsRoute: typeof DocumentsRoute
   HistoryRoute: typeof HistoryRoute
   IssueRoute: typeof IssueRoute
   PrintersRoute: typeof PrintersRoute
@@ -167,6 +193,20 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/analytics': {
+      id: '/analytics'
+      path: '/analytics'
+      fullPath: '/analytics'
+      preLoaderRoute: typeof AnalyticsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/documents': {
+      id: '/documents'
+      path: '/documents'
+      fullPath: '/documents'
+      preLoaderRoute: typeof DocumentsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/history': {
@@ -237,6 +277,8 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AnalyticsRoute: AnalyticsRoute,
+  DocumentsRoute: DocumentsRoute,
   HistoryRoute: HistoryRoute,
   IssueRoute: IssueRoute,
   PrintersRoute: PrintersRoute,

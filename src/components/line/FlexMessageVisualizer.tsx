@@ -11,6 +11,7 @@ export interface FlexComponentSpec {
   size?: string;
   color?: string;
   weight?: string;
+  height?: string;
   align?: string;
   wrap?: boolean;
   flex?: number;
@@ -227,7 +228,7 @@ function RenderFlexComponent({
   defaultColor,
 }: {
   component: FlexComponentSpec;
-  defaultColor?: string;
+  defaultColor?: string | undefined;
 }) {
   if (!component) return null;
 

@@ -8,7 +8,7 @@
  * - Image Canvas Snapshot
  */
 
-import { DEFAULT_STORE_NAME, getSystemStoreName } from "./flex-templates";
+import { getSystemStoreName } from "./flex-templates";
 
 export interface ExportOrderItem {
   productName: string;
@@ -170,6 +170,7 @@ export function printOrderAsPDF(order: ExportOrderPayload) {
     return;
   }
 
+  const resolvedStoreName = getSystemStoreName(order.storeName);
   const itemsHtml = order.items
     .map(
       (item, idx) => `

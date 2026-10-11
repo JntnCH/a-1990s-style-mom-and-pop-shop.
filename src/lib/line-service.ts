@@ -4,10 +4,10 @@
  * Strictly adheres to Zero-Secret-Leakage: All keys come from Environment Injection.
  */
 
+import type { Liff } from "@line/liff";
 import { MasterStore, type ProductItem } from "./store";
 import {
   createDailySummaryFlexBubble,
-  createPurchaseOrderFlexBubble,
   createStockAlertFlexBubble,
   DEFAULT_STORE_NAME,
   type FlexItemGroupBy,
@@ -18,12 +18,53 @@ import {
   type PurchaseOrderFlexOptions,
   type StockAlertFlexOptions,
 } from "./flex-templates";
+import {
+  getLatestPurchaseOrderFlexMessage,
+  populatePurchaseOrderFlexTemplate,
+} from "./flex-templates/flex-simulator-json";
 import { getLineServerConfigFn, sendLineMessagingApiFn } from "./line-server-fn";
 
 export interface LineOrderItem {
   product: ProductItem;
   quantity: number;
   unitName: string;
+}
+
+type LiffMessage = Parameters<Liff["shareTargetPicker"]>[0][number];
+type LiffFlexMessage = Extract<LiffMessage, { type: "flex" }>;
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isFlexContents(value: unknown): value is LiffFlexMessage["contents"] {
+  if (!isRecord(value)) return false;
+  if (value["type"] === "bubble") return true;
+  return (
+    value["type"] === "carousel" &&
+    Array.isArray(value["contents"]) &&
+    value["contents"].length > 0 &&
+    value["contents"].every((content) => isRecord(content) && content["type"] === "bubble")
+  );
+}
+
+function toLiffMessage(value: unknown, fallbackText: string): LiffMessage {
+  if (isRecord(value)) {
+    const contents =
+      value["type"] === "flex"
+        ? value["contents"]
+        : isFlexContents(value)
+          ? value
+          : value["contents"];
+    if (isFlexContents(contents)) {
+      const altText =
+        typeof value["altText"] === "string" && value["altText"].trim()
+          ? value["altText"]
+          : fallbackText;
+      return { type: "flex", altText, contents };
+    }
+  }
+  return { type: "text", text: fallbackText };
 }
 
 export interface LineConfigStatus {
@@ -106,7 +147,6 @@ export function setClientLiffId(id: string): void {
     }
   }
   liffInstance = null;
-  liffInitPromise = null;
 }
 
 let liffInstance: typeof import("@line/liff").default | null = null;
@@ -219,8 +259,8 @@ export async function getLineStatus(): Promise<LineConfigStatus> {
 }
 
 /**
- * Generates LINE Flex Message payload for Daily Purchase Order.
- * Specifications: จัดกลุ่มหมวดหมู่/โซน -> รายการ -> จำนวน -> หน่วยนับ
+ * Reads the active purchase-order Flex payload from the latest JSON saved by the LINE Simulator box.
+ * Order-message contents are never regenerated from the cart or product database.
  */
 export function buildOrderFlexMessage(
   orders: LineOrderItem[],
@@ -228,35 +268,21 @@ export function buildOrderFlexMessage(
   storeName: string = DEFAULT_STORE_NAME,
   options?: Partial<PurchaseOrderFlexOptions>,
 ) {
-  const items: FlexOrderItem[] = orders.map((o) => {
-    const catName = o.product.categoryId
-      ? MasterStore.getCategoryName(o.product.categoryId)
-      : undefined;
-    const zName = o.product.zoneId ? MasterStore.getZoneName(o.product.zoneId) : undefined;
-    return {
-      name: o.product.name,
-      quantity: o.quantity,
-      unitName: o.unitName,
-      costPrice: o.product.costPrice,
-      barcode: o.product.barcode,
-      categoryId: o.product.categoryId,
-      categoryName: catName,
-      zoneId: o.product.zoneId,
-      zoneName: zName,
-    };
-  });
-
-  const liffId = getClientLiffId() || undefined;
-  const resolvedStoreName = getSystemStoreName(storeName);
-
-  return createPurchaseOrderFlexBubble(items, {
-    storeName: resolvedStoreName,
-    note,
-    liffId,
-    groupBy: options?.groupBy || "category",
-    showGroupHeaders: options?.showGroupHeaders,
-    includeZone: options?.includeZone ?? false,
+  const templateItems: OrderFlexItem[] = orders.map((order) => ({
+    name: order.product.name,
+    quantity: order.quantity,
+    unitName: order.unitName,
+    barcode: order.product.barcode,
+    costPrice: order.product.costPrice,
+    categoryId: order.product.categoryId,
+    categoryName: MasterStore.getCategoryName(order.product.categoryId),
+    zoneId: order.product.zoneId,
+    zoneName: MasterStore.getZoneName(order.product.zoneId),
+    priceEstimate: order.quantity * order.product.costPrice,
+  }));
+  return formatDailyOrderFlexMessage(templateItems, options?.dateStr, storeName, {
     ...options,
+    note: options?.note ?? note,
   });
 }
 
@@ -387,37 +413,7 @@ export async function shareFlexViaLiffPicker(
   }
 
   try {
-    let messagePayload: Record<string, unknown>;
-    if (flexMessage && typeof flexMessage === "object") {
-      const flexObj = flexMessage as Record<string, unknown>;
-      if (flexObj["type"] === "flex" && flexObj["contents"]) {
-        messagePayload = {
-          type: "flex",
-          altText: (flexObj["altText"] as string) || altSummary,
-          contents: flexObj["contents"],
-        };
-      } else if (flexObj["type"] === "bubble" || flexObj["type"] === "carousel") {
-        messagePayload = {
-          type: "flex",
-          altText: altSummary,
-          contents: flexObj,
-        };
-      } else if (flexObj["contents"]) {
-        messagePayload = {
-          type: "flex",
-          altText: (flexObj["altText"] as string) || altSummary,
-          contents: flexObj["contents"],
-        };
-      } else {
-        messagePayload = {
-          type: "flex",
-          altText: altSummary,
-          contents: flexObj,
-        };
-      }
-    } else {
-      messagePayload = { type: "text", text: altSummary };
-    }
+    const messagePayload = toLiffMessage(flexMessage, altSummary);
 
     // Diagnostic check for API availability in this environment
     const isApiAvailable =
@@ -489,10 +485,10 @@ export async function sendWith3TierFallback(
     const serverRes = await sendLineMessagingApiFn({
       data: {
         orderSummary: summary,
-        flexMessage,
-        toUserIdOrGroupId,
-        isBroadcast,
-        channelAccessToken: tokenToUse,
+        ...(flexMessage !== undefined ? { flexMessage } : {}),
+        ...(toUserIdOrGroupId !== undefined ? { toUserIdOrGroupId } : {}),
+        ...(isBroadcast !== undefined ? { isBroadcast } : {}),
+        ...(tokenToUse !== undefined ? { channelAccessToken: tokenToUse } : {}),
       },
     });
 
@@ -524,7 +520,7 @@ export async function sendWith3TierFallback(
     try {
       const initialized = await initLiff();
       if (initialized && liffInstance) {
-        const messagePayload = flexMessage || { type: "text", text: summary };
+        const messagePayload = toLiffMessage(flexMessage, summary);
 
         // 2a. shareTargetPicker (sends REAL Flex Message inside LINE)
         if (liffInstance.isApiAvailable("shareTargetPicker") && liffInstance.isLoggedIn()) {
@@ -639,48 +635,81 @@ export interface OrderFlexItem {
   name: string;
   quantity: number;
   unitName: string;
-  barcode?: string;
-  costPrice?: number;
-  priceEstimate?: number;
-  categoryId?: string;
-  categoryName?: string;
-  zoneId?: string;
-  zoneName?: string;
+  barcode?: string | undefined;
+  costPrice?: number | undefined;
+  priceEstimate?: number | undefined;
+  categoryId?: string | undefined;
+  categoryName?: string | undefined;
+  zoneId?: string | undefined;
+  zoneName?: string | undefined;
+  note?: string | undefined;
 }
 
+function productFromOrderItem(item: OrderFlexItem, timestamp: string): ProductItem {
+  const id = item.barcode || item.name;
+  return {
+    id,
+    sku: id,
+    barcode: item.barcode || "",
+    codeType: "Barcode",
+    name: item.name,
+    categoryId: item.categoryId || "",
+    zoneId: item.zoneId || "",
+    unitId: "",
+    costPrice:
+      item.costPrice ??
+      (item.priceEstimate && item.quantity ? item.priceEstimate / item.quantity : 0),
+    sellPrice: 0,
+    stock: 0,
+    minStock: 0,
+    targetStock: 0,
+    reorderQuantity: item.quantity,
+    isActive: true,
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  };
+}
+
+/** Use the latest Simulator JSON for layout and the current order items for message data. */
 export function formatDailyOrderFlexMessage(
   items: OrderFlexItem[],
   dateStr?: string,
   storeName: string = DEFAULT_STORE_NAME,
   options?: Partial<PurchaseOrderFlexOptions>,
 ) {
-  const resolvedStoreName = getSystemStoreName(storeName);
-  const nowStr = new Date().toISOString();
-  const lineOrders: LineOrderItem[] = items.map((i) => ({
-    product: {
-      id: i.barcode || i.name,
-      barcode: i.barcode || "",
-      codeType: "Barcode",
-      name: i.name,
-      categoryId: i.categoryId || "",
-      zoneId: i.zoneId || "",
-      unitId: "",
-      costPrice: i.costPrice ?? (i.priceEstimate && i.quantity ? i.priceEstimate / i.quantity : 0),
-      sellPrice: 0,
-      stock: 0,
-      minStock: 0,
-      reorderQuantity: i.quantity,
-      updatedAt: nowStr,
-    },
-    quantity: i.quantity,
-    unitName: i.unitName,
+  const resolvedDate = options?.dateStr ?? dateStr ?? new Date().toLocaleDateString("th-TH");
+  const templateItems = items.map((item) => ({
+    productName: item.name,
+    quantity: item.quantity,
+    unitName: item.unitName,
+    ...(item.barcode === undefined ? {} : { barcode: item.barcode }),
+    ...(item.categoryName === undefined
+      ? item.categoryId === undefined
+        ? {}
+        : { categoryName: MasterStore.getCategoryName(item.categoryId) }
+      : { categoryName: item.categoryName }),
+    ...(item.zoneName === undefined
+      ? item.zoneId === undefined
+        ? {}
+        : { zoneName: MasterStore.getZoneName(item.zoneId) }
+      : { zoneName: item.zoneName }),
+    ...(item.costPrice === undefined ? {} : { costPrice: item.costPrice }),
+    total: item.priceEstimate ?? item.quantity * (item.costPrice ?? 0),
+    ...(item.note === undefined ? {} : { note: item.note }),
   }));
-  return buildOrderFlexMessage(
-    lineOrders,
-    `ใบสั่งซื้อประจำวัน (${dateStr || "วันนี้"})`,
-    resolvedStoreName,
-    options,
-  );
+  const totalQuantity = templateItems.reduce((sum, item) => sum + item.quantity, 0);
+  const totalCost = templateItems.reduce((sum, item) => sum + (item.total ?? 0), 0);
+
+  return populatePurchaseOrderFlexTemplate(getLatestPurchaseOrderFlexMessage(), {
+    orderNumber: options?.orderNumber ?? "DRAFT",
+    orderDate: resolvedDate,
+    storeName: getSystemStoreName(options?.storeName ?? storeName),
+    supplierName: options?.supplierName ?? "ซัพพลายเออร์ทั่วไป",
+    items: templateItems,
+    totalQuantity,
+    totalCost,
+    ...(options?.note === undefined ? {} : { note: options.note }),
+  });
 }
 
 export function formatOrderPlainText(
@@ -692,21 +721,7 @@ export function formatOrderPlainText(
   const resolvedStoreName = getSystemStoreName(storeName);
   const nowStr = new Date().toISOString();
   const lineOrders: LineOrderItem[] = items.map((i) => ({
-    product: {
-      id: i.barcode || i.name,
-      barcode: i.barcode || "",
-      codeType: "Barcode",
-      name: i.name,
-      categoryId: i.categoryId || "",
-      zoneId: i.zoneId || "",
-      unitId: "",
-      costPrice: i.costPrice ?? (i.priceEstimate && i.quantity ? i.priceEstimate / i.quantity : 0),
-      sellPrice: 0,
-      stock: 0,
-      minStock: 0,
-      reorderQuantity: i.quantity,
-      updatedAt: nowStr,
-    },
+    product: productFromOrderItem(i, nowStr),
     quantity: i.quantity,
     unitName: i.unitName,
   }));
@@ -723,21 +738,7 @@ export async function sendDailyOrderToLine(
   const resolvedStoreName = getSystemStoreName(storeName);
   const nowStr = new Date().toISOString();
   const lineOrders: LineOrderItem[] = items.map((i) => ({
-    product: i.product || {
-      id: i.barcode || i.name,
-      barcode: i.barcode || "",
-      codeType: "Barcode",
-      name: i.name,
-      categoryId: i.categoryId || "",
-      zoneId: i.zoneId || "",
-      unitId: "",
-      costPrice: i.priceEstimate && i.quantity ? i.priceEstimate / i.quantity : 0,
-      sellPrice: 0,
-      stock: 0,
-      minStock: 0,
-      reorderQuantity: i.quantity,
-      updatedAt: nowStr,
-    },
+    product: i.product ?? productFromOrderItem(i, nowStr),
     quantity: i.quantity,
     unitName: i.unitName,
   }));
@@ -806,10 +807,11 @@ export async function sendStockAlertToLine(
     target,
   });
 
-  return {
+  const result: { success: boolean; method?: string; error?: string; tier?: number } = {
     success: res.success,
     method: res.channel,
     tier: res.tier,
-    error: res.success ? undefined : res.message,
   };
+  if (!res.success) result.error = res.message;
+  return result;
 }

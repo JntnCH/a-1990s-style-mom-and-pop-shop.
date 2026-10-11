@@ -117,15 +117,17 @@ export function StaffManagementTab() {
       return;
     }
 
+    const phone = formPhone.trim();
+    const lastLoginAt = editingUser?.lastLoginAt;
     const userData: StaffUser = {
       id: editingUser?.id || `usr-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
       name: formName.trim(),
       username: formUsername.trim().toLowerCase(),
       pin: formPin.trim(),
       role: formRole,
-      phone: formPhone.trim() || undefined,
+      ...(phone ? { phone } : {}),
       isActive: formIsActive,
-      lastLoginAt: editingUser?.lastLoginAt,
+      ...(lastLoginAt !== undefined ? { lastLoginAt } : {}),
     };
 
     AuthService.saveUser(userData);

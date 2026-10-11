@@ -5,6 +5,17 @@ import {
   createDailySummaryFlexBubble,
 } from "./index";
 
+function requiredAt<T>(values: readonly T[], index: number): T {
+  const value = values[index];
+  if (value === undefined) throw new Error(`Expected an item at index ${index}`);
+  return value;
+}
+
+function requiredValue<T>(value: T | undefined): T {
+  if (value === undefined) throw new Error("Expected a value to be present");
+  return value;
+}
+
 describe("Flex Message Template Customization (Separated Qty/Unit & Large Font)", () => {
   it("creates Purchase Order flex with separated quantity and unit columns by default", () => {
     const flex = createPurchaseOrderFlexBubble([
@@ -22,7 +33,7 @@ describe("Flex Message Template Customization (Separated Qty/Unit & Large Font)"
 
     // Header has larger store title
     const headerContents = contents.header.contents;
-    const storeText = headerContents[0];
+    const storeText = requiredAt(headerContents, 0);
     expect(storeText.size).toBe("xl");
 
     // Body should contain table header with 3 separated columns
@@ -36,10 +47,10 @@ describe("Flex Message Template Customization (Separated Qty/Unit & Large Font)"
     expect(tableHeader.type).toBe("box");
     expect(tableHeader.layout).toBe("horizontal");
     expect(tableHeader.contents.length).toBe(3);
-    expect(tableHeader.contents[0].text).toBe("รายการสินค้า");
-    expect(tableHeader.contents[1].text).toBe("จำนวน");
-    expect(tableHeader.contents[2].text).toBe("หน่วยนับ");
-    expect(tableHeader.contents[0].size).toBe("sm");
+    expect(requiredAt(tableHeader.contents, 0).text).toBe("รายการสินค้า");
+    expect(requiredAt(tableHeader.contents, 1).text).toBe("จำนวน");
+    expect(requiredAt(tableHeader.contents, 2).text).toBe("หน่วยนับ");
+    expect(requiredAt(tableHeader.contents, 0).size).toBe("sm");
 
     // Item row should have 3 separated columns with larger fonts (after group header banner)
     const itemsBox = bodyContents[2] as {
@@ -50,14 +61,16 @@ describe("Flex Message Template Customization (Separated Qty/Unit & Large Font)"
       }>;
     };
     // If group header is enabled, item row is after group header
-    const productRow = itemsBox.contents.find((c) => c.contents && c.contents.length === 3);
+    const productRow = requiredValue(
+      itemsBox.contents.find((c) => c.contents && c.contents.length === 3),
+    );
     expect(productRow).toBeDefined();
-    expect(productRow?.contents[0].text).toContain("ปลาร้า แม่เหรียญ");
-    expect(productRow?.contents[0].size).toBe("md");
-    expect(productRow?.contents[1].text).toBe("5");
-    expect(productRow?.contents[1].size).toBe("lg");
-    expect(productRow?.contents[2].text).toBe("แพ็ค");
-    expect(productRow?.contents[2].size).toBe("md");
+    expect(requiredAt(productRow.contents, 0).text).toContain("ปลาร้า แม่เหรียญ");
+    expect(requiredAt(productRow.contents, 0).size).toBe("md");
+    expect(requiredAt(productRow.contents, 1).text).toBe("5");
+    expect(requiredAt(productRow.contents, 1).size).toBe("lg");
+    expect(requiredAt(productRow.contents, 2).text).toBe("แพ็ค");
+    expect(requiredAt(productRow.contents, 2).size).toBe("md");
   });
 
   it("creates Stock Alert flex with separated stock and unit columns and large font", () => {
@@ -81,9 +94,9 @@ describe("Flex Message Template Customization (Separated Qty/Unit & Large Font)"
       contents: Array<{ text: string; size?: string }>;
     };
     expect(tableHeader.contents.length).toBe(3);
-    expect(tableHeader.contents[0].text).toBe("รายการสินค้า");
-    expect(tableHeader.contents[1].text).toBe("คงเหลือ");
-    expect(tableHeader.contents[2].text).toBe("หน่วยนับ");
+    expect(requiredAt(tableHeader.contents, 0).text).toBe("รายการสินค้า");
+    expect(requiredAt(tableHeader.contents, 1).text).toBe("คงเหลือ");
+    expect(requiredAt(tableHeader.contents, 2).text).toBe("หน่วยนับ");
 
     // Alert row has separated values (after group header banner)
     const itemsBox = bodyContents[2] as {
@@ -91,13 +104,15 @@ describe("Flex Message Template Customization (Separated Qty/Unit & Large Font)"
         contents: Array<{ text: string; size?: string }>;
       }>;
     };
-    const productRow = itemsBox.contents.find((c) => c.contents && c.contents.length === 3);
+    const productRow = requiredValue(
+      itemsBox.contents.find((c) => c.contents && c.contents.length === 3),
+    );
     expect(productRow).toBeDefined();
-    expect(productRow?.contents[0].text).toContain("นมสดจืด");
-    expect(productRow?.contents[1].text).toBe("2");
-    expect(productRow?.contents[1].size).toBe("lg");
-    expect(productRow?.contents[2].text).toBe("กล่อง");
-    expect(productRow?.contents[2].size).toBe("md");
+    expect(requiredAt(productRow.contents, 0).text).toContain("นมสดจืด");
+    expect(requiredAt(productRow.contents, 1).text).toBe("2");
+    expect(requiredAt(productRow.contents, 1).size).toBe("lg");
+    expect(requiredAt(productRow.contents, 2).text).toBe("กล่อง");
+    expect(requiredAt(productRow.contents, 2).size).toBe("md");
   });
 
   it("allows toggling back to 2 columns and medium font when requested", () => {
@@ -120,9 +135,9 @@ describe("Flex Message Template Customization (Separated Qty/Unit & Large Font)"
       contents: Array<{ text: string; size?: string }>;
     };
     expect(tableHeader.contents.length).toBe(2);
-    expect(tableHeader.contents[0].text).toBe("รายการสินค้าที่จะสั่งซื้อ");
-    expect(tableHeader.contents[1].text).toBe("จำนวน / หน่วยนับ");
-    expect(tableHeader.contents[0].size).toBe("xs");
+    expect(requiredAt(tableHeader.contents, 0).text).toBe("รายการสินค้าที่จะสั่งซื้อ");
+    expect(requiredAt(tableHeader.contents, 1).text).toBe("จำนวน / หน่วยนับ");
+    expect(requiredAt(tableHeader.contents, 0).size).toBe("xs");
   });
 
   it("does not include zone in the Flex Message headers by default", () => {
@@ -154,12 +169,12 @@ describe("Flex Message Template Customization (Separated Qty/Unit & Large Font)"
 
     // Find group header banners (they have 2 items: title and count)
     const headerBanners = itemsBox.contents.filter(
-      (c) => c.contents && c.contents.length === 2 && c.contents[0].text.startsWith("🏷️"),
+      (c) => c.contents.length === 2 && requiredAt(c.contents, 0).text.startsWith("🏷️"),
     );
 
     expect(headerBanners.length).toBeGreaterThan(0);
     headerBanners.forEach((banner) => {
-      const bannerText = banner.contents[0].text;
+      const bannerText = requiredAt(banner.contents, 0).text;
       // Must NOT contain 📍 or zone names
       expect(bannerText).not.toContain("📍");
       expect(bannerText).not.toContain("ตู้แช่");
@@ -179,7 +194,7 @@ describe("Flex Message Template Customization (Separated Qty/Unit & Large Font)"
       reorderCount: 10,
     });
 
-    expect(flex.contents.header.contents[0].size).toBe("xl");
-    expect(flex.contents.header.contents[1].size).toBe("md");
+    expect(requiredAt(flex.contents.header.contents, 0).size).toBe("xl");
+    expect(requiredAt(flex.contents.header.contents, 1).size).toBe("md");
   });
 });

@@ -70,12 +70,12 @@ export interface SalesDocument {
   customer: CustomerInfo;
   items: DocumentItem[];
   calculation: DocumentCalculation;
-  paymentMethod?: PaymentMethod;
-  paymentDate?: string;
+  paymentMethod?: PaymentMethod | undefined;
+  paymentDate?: string | undefined;
   paymentRef?: string;
   notes?: string;
-  termsAndConditions?: string;
-  salesPerson?: string;
+  termsAndConditions?: string | undefined;
+  salesPerson?: string | undefined;
   createdAt: string;
   updatedAt: string;
   stockDeducted?: boolean; // ตัดสต็อกแล้วหรือยัง

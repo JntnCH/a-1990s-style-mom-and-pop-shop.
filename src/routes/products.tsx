@@ -215,6 +215,7 @@ function ProductsPage() {
       };
     } else {
       stopScanner();
+      return undefined;
     }
   }, [modalOpen, scannerActive, startScanner, stopScanner]);
 

@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { Route as rootRoute } from "./__root";
 import {
   ArrowRightLeft,
   Building2,
@@ -57,6 +58,18 @@ import {
 } from "@/lib/sales-document-service";
 import { DocumentA4Print } from "@/components/documents/DocumentA4Print";
 import { DocumentModal } from "@/components/documents/DocumentModal";
+
+declare module "@tanstack/react-router" {
+  interface FileRoutesByPath {
+    "/documents": {
+      id: "/documents";
+      path: "/documents";
+      fullPath: "/documents";
+      preLoaderRoute: typeof rootRoute;
+      parentRoute: typeof rootRoute;
+    };
+  }
+}
 
 export const Route = createFileRoute("/documents")({
   component: DocumentsPage,
@@ -279,35 +292,36 @@ function DocumentsPage() {
       <PageHeader
         title="เอกสารขาย & ใบกำกับภาษี (Sales & Tax Invoices)"
         description="ระบบบริหารเอกสารขายสไตล์ FlowAccount: ใบเสนอราคา, ใบแจ้งหนี้/วางบิล, ใบกำกับภาษี VAT 7%, และรายงาน ภ.พ.30"
-      >
-        <div className="flex flex-wrap gap-2">
-          <Button
-            size="sm"
-            variant="outline"
-            className="gap-1.5 rounded-xl text-xs font-semibold"
-            onClick={() => handleOpenCreate("QUOTATION")}
-          >
-            <Plus className="size-3.5 text-sky-600" /> + ใบเสนอราคา (QT)
-          </Button>
+        action={
+          <div className="flex flex-wrap gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              className="gap-1.5 rounded-xl text-xs font-semibold"
+              onClick={() => handleOpenCreate("QUOTATION")}
+            >
+              <Plus className="size-3.5 text-sky-600" /> + ใบเสนอราคา (QT)
+            </Button>
 
-          <Button
-            size="sm"
-            variant="outline"
-            className="gap-1.5 rounded-xl text-xs font-semibold"
-            onClick={() => handleOpenCreate("BILLING_INVOICE")}
-          >
-            <Plus className="size-3.5 text-indigo-600" /> + ใบแจ้งหนี้ (INV)
-          </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              className="gap-1.5 rounded-xl text-xs font-semibold"
+              onClick={() => handleOpenCreate("BILLING_INVOICE")}
+            >
+              <Plus className="size-3.5 text-indigo-600" /> + ใบแจ้งหนี้ (INV)
+            </Button>
 
-          <Button
-            size="sm"
-            className="gap-1.5 rounded-xl text-xs font-semibold shadow-sm"
-            onClick={() => handleOpenCreate("TAX_INVOICE_RECEIPT")}
-          >
-            <Receipt className="size-3.5" /> + ออกใบกำกับภาษี (TAX)
-          </Button>
-        </div>
-      </PageHeader>
+            <Button
+              size="sm"
+              className="gap-1.5 rounded-xl text-xs font-semibold shadow-sm"
+              onClick={() => handleOpenCreate("TAX_INVOICE_RECEIPT")}
+            >
+              <Receipt className="size-3.5" /> + ออกใบกำกับภาษี (TAX)
+            </Button>
+          </div>
+        }
+      />
 
       {/* KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">

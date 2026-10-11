@@ -530,7 +530,7 @@ export const PrinterService = {
       ...job,
       id: `job-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
       createdAt: now,
-      completedAt: job.status === "COMPLETED" ? now : undefined,
+      ...(job.status === "COMPLETED" ? { completedAt: now } : {}),
     };
 
     const nextList = [newJob, ...list];
@@ -602,7 +602,7 @@ export const PrinterService = {
       status: "COMPLETED",
       operator: "ผู้ใช้งาน (Reprint)",
       payloadSummary: job.payloadSummary,
-      rawHtml: job.rawHtml,
+      ...(job.rawHtml !== undefined ? { rawHtml: job.rawHtml } : {}),
     });
 
     return true;

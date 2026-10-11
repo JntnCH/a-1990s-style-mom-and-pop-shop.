@@ -132,17 +132,19 @@ export interface StaffUser {
 const STORAGE_KEY_USERS = "minimark_rbac_users_v1";
 const STORAGE_KEY_CURRENT_USER_ID = "minimark_rbac_current_user_v1";
 
+const DEFAULT_ADMIN_USER: StaffUser = {
+  id: "usr-admin",
+  name: "คุณประสิทธิ์ (เจ้าของร้าน)",
+  username: "admin",
+  pin: "1234",
+  role: "ADMIN",
+  phone: "081-987-6543",
+  isActive: true,
+  lastLoginAt: "25/09/2026 14:30 น.",
+};
+
 export const DEFAULT_USERS: StaffUser[] = [
-  {
-    id: "usr-admin",
-    name: "คุณประสิทธิ์ (เจ้าของร้าน)",
-    username: "admin",
-    pin: "1234",
-    role: "ADMIN",
-    phone: "081-987-6543",
-    isActive: true,
-    lastLoginAt: "25/09/2026 14:30 น.",
-  },
+  DEFAULT_ADMIN_USER,
   {
     id: "usr-mgr",
     name: "คุณวิภา (ผู้จัดการสาขา)",
@@ -192,17 +194,18 @@ export const AuthService = {
 
   getCurrentUser(): StaffUser {
     const users = this.getUsers();
-    if (typeof window === "undefined") return users[0];
+    const fallbackUser = users[0] ?? DEFAULT_ADMIN_USER;
+    if (typeof window === "undefined") return fallbackUser;
     try {
       const currentId = localStorage.getItem(STORAGE_KEY_CURRENT_USER_ID);
       const found = users.find((u) => u.id === currentId && u.isActive);
       if (found) return found;
       // Default to first admin user
-      const admin = users.find((u) => u.role === "ADMIN" && u.isActive) || users[0];
+      const admin = users.find((u) => u.role === "ADMIN" && u.isActive) ?? fallbackUser;
       localStorage.setItem(STORAGE_KEY_CURRENT_USER_ID, admin.id);
       return admin;
     } catch {
-      return users[0];
+      return fallbackUser;
     }
   },
 

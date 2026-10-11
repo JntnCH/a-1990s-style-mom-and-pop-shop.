@@ -69,7 +69,11 @@ import {
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useBarcodeScanner } from "@/hooks/use-barcode-scanner";
-import { PrinterService, type ReceiptPrintData } from "@/lib/printer-service";
+import {
+  DEFAULT_RECEIPT_CONFIG,
+  PrinterService,
+  type ReceiptPrintData,
+} from "@/lib/printer-service";
 import {
   calculateDocument,
   DEFAULT_COMPANY_INFO,
@@ -336,7 +340,7 @@ function PosAndIssuePage() {
 
     const customer: CustomerInfo = {
       name: customerType === "general" ? "ลูกค้าทั่วไป (Cash Customer)" : customerName.trim(),
-      taxId: customerType === "custom" && customerTaxId ? customerTaxId.trim() : undefined,
+      ...(customerType === "custom" && customerTaxId ? { taxId: customerTaxId.trim() } : {}),
       branchType: "HEAD_OFFICE",
       address: customerType === "custom" && customerAddress ? customerAddress.trim() : "หน้าร้าน",
     };
@@ -1160,6 +1164,7 @@ function PosAndIssuePage() {
                 <div className="bg-muted/40 p-3 rounded-2xl flex justify-center overflow-x-auto">
                   <ThermalReceiptPreview
                     config={{
+                      ...DEFAULT_RECEIPT_CONFIG,
                       storeName: DEFAULT_COMPANY_INFO.name,
                       taxId: DEFAULT_COMPANY_INFO.taxId,
                       address: DEFAULT_COMPANY_INFO.address,
@@ -1169,42 +1174,42 @@ function PosAndIssuePage() {
                       paperWidth: "58mm",
                       showLogo: true,
                       showBarcode: true,
-                      showCashier: true,
-                      showVatBreakdown: true,
+                      showCashierName: true,
                       showPromptPayQR: completedDoc.paymentMethod === "PROMPTPAY",
                       promptPayId: DEFAULT_COMPANY_INFO.promptPayNumber || "0105566012345",
                     }}
                     data={{
                       receiptNumber: completedDoc.docNumber,
-                      date: completedDoc.issueDate,
-                      time: new Date().toLocaleTimeString("th-TH"),
+                      date: `${completedDoc.issueDate} ${new Date().toLocaleTimeString("th-TH")}`,
                       cashierName: completedDoc.salesPerson || "แคชเชียร์หน้าร้าน",
-                      customerName: completedDoc.customer.name,
                       items: completedDoc.items.map((it) => ({
                         name: it.name,
                         quantity: it.quantity,
                         unitPrice: it.unitPrice,
-                        totalPrice: it.total,
-                        barcode: it.barcode,
+                        total: it.total,
                       })),
                       subtotal: completedDoc.calculation.subtotal,
                       discount: completedDoc.calculation.discountTotal,
+                      vatRate: completedDoc.calculation.vatRate / 100,
                       vatAmount: completedDoc.calculation.vatAmount,
                       grandTotal: completedDoc.calculation.grandTotal,
-                      paymentMethod: completedDoc.paymentMethod || "CASH",
-                      cashReceived: cashReceived,
-                      change: changeAmount,
-                      barcode: completedDoc.docNumber,
+                      paidAmount:
+                        completedDoc.paymentMethod === "CASH"
+                          ? cashReceived
+                          : completedDoc.calculation.grandTotal,
+                      changeAmount,
+                      paymentMethod:
+                        completedDoc.paymentMethod === "CASH"
+                          ? "CASH"
+                          : completedDoc.paymentMethod === "PROMPTPAY"
+                            ? "PROMPTPAY"
+                            : "TRANSFER",
                     }}
                   />
                 </div>
               ) : (
                 <div className="bg-muted/40 p-2 rounded-2xl max-h-[50vh] overflow-y-auto">
-                  <DocumentA4Print
-                    doc={completedDoc}
-                    company={DEFAULT_COMPANY_INFO}
-                    printMode="VIEW"
-                  />
+                  <DocumentA4Print document={completedDoc} company={DEFAULT_COMPANY_INFO} />
                 </div>
               )}
             </div>

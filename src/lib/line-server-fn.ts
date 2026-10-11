@@ -4,13 +4,18 @@ import {
   DEFAULT_STORE_NAME,
   getSystemStoreName,
 } from "./flex-templates";
-import {
-  getDatabaseSnapshot,
-  syncDatabasePayload,
-  type DBProductItem,
-  type DBPurchaseOrder,
-} from "../db/db-service.ts";
+import { getDatabaseSnapshot, syncDatabasePayload } from "../db/db-service.ts";
 import { removeLegacySampleLineFollowers } from "./line-follower-data";
+import type {
+  CategoryItem,
+  LineUserFollower,
+  ProductItem,
+  PurchaseOrderRecord,
+  ReceiveItem,
+  StockMovementLog,
+  UnitItem,
+  ZoneItem,
+} from "./store";
 
 export interface SendLineOrderPayload {
   toUserIdOrGroupId?: string | undefined;
@@ -23,8 +28,8 @@ export interface SendLineOrderPayload {
 export interface ServerLineFollower {
   userId: string;
   displayName: string;
-  pictureUrl?: string | undefined;
-  statusMessage?: string | undefined;
+  pictureUrl?: string | null | undefined;
+  statusMessage?: string | null | undefined;
   followedAt: string;
   lastInteractionAt: string;
   role: "admin" | "staff" | "viewer";
@@ -32,31 +37,46 @@ export interface ServerLineFollower {
 
 export interface ServerSyncPayload {
   lastUpdated?: string | undefined;
-  products?: unknown[] | undefined;
-  categories?: unknown[] | undefined;
-  zones?: unknown[] | undefined;
-  units?: unknown[] | undefined;
-  receives?: unknown[] | undefined;
-  followers?: ServerLineFollower[] | undefined;
-  movements?: unknown[] | undefined;
-  purchaseOrders?: unknown[] | undefined;
+  products?: ProductItem[] | undefined;
+  categories?: CategoryItem[] | undefined;
+  zones?: ZoneItem[] | undefined;
+  units?: UnitItem[] | undefined;
+  receives?: ReceiveItem[] | undefined;
+  followers?: LineUserFollower[] | undefined;
+  movements?: StockMovementLog[] | undefined;
+  purchaseOrders?: PurchaseOrderRecord[] | undefined;
 }
+
+type JsonValue = string | number | boolean | null | JsonValue[] | { [key: string]: JsonValue };
+type DatabaseSnapshot = Awaited<ReturnType<typeof getDatabaseSnapshot>>;
+type DatabaseFollower = DatabaseSnapshot["followers"][number];
+type SnapshotPurchaseOrder = Omit<DatabaseSnapshot["purchaseOrders"][number], "items"> & {
+  items: JsonValue[];
+};
 
 // In-Memory Global Server Store (Single Source of Truth across all active clients)
 const globalServerDatabase: {
   lastUpdated: string;
-  products?: unknown[] | undefined;
-  categories?: unknown[] | undefined;
-  zones?: unknown[] | undefined;
-  units?: unknown[] | undefined;
-  receives?: unknown[] | undefined;
-  followers: ServerLineFollower[];
-  movements?: unknown[] | undefined;
-  purchaseOrders?: unknown[] | undefined;
+  products?: ProductItem[] | DatabaseSnapshot["products"] | undefined;
+  categories?: CategoryItem[] | DatabaseSnapshot["categories"] | undefined;
+  zones?: ZoneItem[] | DatabaseSnapshot["zones"] | undefined;
+  units?: UnitItem[] | DatabaseSnapshot["units"] | undefined;
+  receives?: ReceiveItem[] | DatabaseSnapshot["receives"] | undefined;
+  followers: (ServerLineFollower | DatabaseFollower)[];
+  movements?: StockMovementLog[] | DatabaseSnapshot["movements"] | undefined;
+  purchaseOrders?: PurchaseOrderRecord[] | SnapshotPurchaseOrder[] | undefined;
 } = {
   lastUpdated: new Date().toISOString(),
   followers: [],
 };
+
+function isJsonValue(value: unknown): value is JsonValue {
+  if (value === null || typeof value === "string" || typeof value === "boolean") return true;
+  if (typeof value === "number") return Number.isFinite(value);
+  if (Array.isArray(value)) return value.every(isJsonValue);
+  if (typeof value === "object") return Object.values(value).every(isJsonValue);
+  return false;
+}
 
 export const DEFAULT_LINE_LIFF_ID = "2011710264-gaZ7oEcK";
 
@@ -114,48 +134,60 @@ export const syncMasterDatabaseFn = createServerFn({ method: "POST" })
   .validator((payload: ServerSyncPayload) => payload)
   .handler(async ({ data }) => {
     // 1. If Cloud SQL credentials are set, sync with PostgreSQL
-    if (process.env.SQL_HOST && process.env.SQL_USER && process.env.SQL_PASSWORD) {
+    if (process.env["SQL_HOST"] && process.env["SQL_USER"] && process.env["SQL_PASSWORD"]) {
       try {
         const sqlSnapshot = await syncDatabasePayload({
-          units: data.units as { id: string; name: string; shortName: string }[] | undefined,
-          categories: data.categories as { id: string; code: string; name: string }[] | undefined,
-          zones: data.zones as
-            | {
-                id: string;
-                code: string;
-                name: string;
-                description?: string;
-              }[]
-            | undefined,
-          products: data.products as DBProductItem[] | undefined,
-          purchaseOrders: data.purchaseOrders as DBPurchaseOrder[] | undefined,
-          movements: data.movements as
-            | {
-                id: string;
-                timestamp: string;
-                productId: string;
-                productName: string;
-                barcode: string;
-                type: string;
-                quantity: number;
-                previousStock: number;
-                newStock: number;
-                operator: string;
-                note?: string;
-              }[]
-            | undefined,
-          receives: data.receives as
-            | {
-                id: string;
-                barcode: string;
-                codeType?: string;
-                format?: string;
-                productName: string;
-                unit: string;
-                quantity: number;
-                scannedAt: string;
-              }[]
-            | undefined,
+          ...(data.units === undefined
+            ? {}
+            : { units: data.units.map(({ id, name, shortName }) => ({ id, name, shortName })) }),
+          ...(data.categories === undefined
+            ? {}
+            : {
+                categories: data.categories.map(({ id, code, name }) => ({ id, code, name })),
+              }),
+          ...(data.zones === undefined
+            ? {}
+            : {
+                zones: data.zones.map(({ id, code, name, description }) => ({
+                  id,
+                  code,
+                  name,
+                  ...(description === undefined ? {} : { description }),
+                })),
+              }),
+          ...(data.products === undefined ? {} : { products: data.products }),
+          ...(data.purchaseOrders === undefined ? {} : { purchaseOrders: data.purchaseOrders }),
+          ...(data.movements === undefined
+            ? {}
+            : {
+                movements: data.movements.map((movement) => ({
+                  id: movement.id,
+                  timestamp: movement.timestamp,
+                  productId: movement.productId,
+                  productName: movement.productName,
+                  barcode: movement.barcode,
+                  type: movement.type,
+                  quantity: movement.quantity,
+                  previousStock: movement.previousStock,
+                  newStock: movement.newStock,
+                  operator: movement.operator,
+                  ...(movement.note === undefined ? {} : { note: movement.note }),
+                })),
+              }),
+          ...(data.receives === undefined
+            ? {}
+            : {
+                receives: data.receives.map((receive) => ({
+                  id: receive.id,
+                  barcode: receive.barcode,
+                  codeType: receive.codeType,
+                  ...(receive.format === undefined ? {} : { format: receive.format }),
+                  productName: receive.productName,
+                  unit: receive.unit,
+                  quantity: receive.quantity,
+                  scannedAt: receive.scannedAt,
+                })),
+              }),
           followers: removeLegacySampleLineFollowers(data.followers).map((follower) => ({
             userId: follower.userId,
             displayName: follower.displayName,
@@ -171,10 +203,18 @@ export const syncMasterDatabaseFn = createServerFn({ method: "POST" })
           })),
         });
 
-        const syncedFollowers = removeLegacySampleLineFollowers(
-          sqlSnapshot.followers as ServerLineFollower[] | undefined,
+        const syncedFollowers = removeLegacySampleLineFollowers(sqlSnapshot.followers);
+        const serializedPurchaseOrders: SnapshotPurchaseOrder[] = sqlSnapshot.purchaseOrders.map(
+          (purchaseOrder) => ({
+            ...purchaseOrder,
+            items: purchaseOrder.items.filter(isJsonValue),
+          }),
         );
-        const sanitizedSnapshot = { ...sqlSnapshot, followers: syncedFollowers };
+        const sanitizedSnapshot = {
+          ...sqlSnapshot,
+          followers: syncedFollowers,
+          purchaseOrders: serializedPurchaseOrders,
+        };
 
         globalServerDatabase.products = sqlSnapshot.products;
         globalServerDatabase.categories = sqlSnapshot.categories;
@@ -183,7 +223,7 @@ export const syncMasterDatabaseFn = createServerFn({ method: "POST" })
         globalServerDatabase.receives = sqlSnapshot.receives;
         globalServerDatabase.followers = syncedFollowers;
         globalServerDatabase.movements = sqlSnapshot.movements;
-        globalServerDatabase.purchaseOrders = sqlSnapshot.purchaseOrders;
+        globalServerDatabase.purchaseOrders = serializedPurchaseOrders;
         globalServerDatabase.lastUpdated = new Date().toISOString();
 
         return {
@@ -354,7 +394,12 @@ export const syncLineFollowersFn = createServerFn({ method: "POST" }).handler(as
             statusMessage: profile?.statusMessage,
             followedAt: existing?.followedAt || "ไม่ระบุวันที่จาก LINE",
             lastInteractionAt: syncedAt,
-            role: existing?.role || "viewer",
+            role:
+              existing?.role === "admin" ||
+              existing?.role === "staff" ||
+              existing?.role === "viewer"
+                ? existing.role
+                : "viewer",
           };
         } catch {
           profiles[index] = {
@@ -362,7 +407,12 @@ export const syncLineFollowersFn = createServerFn({ method: "POST" }).handler(as
             displayName: userId,
             followedAt: existing?.followedAt || "ไม่ระบุวันที่จาก LINE",
             lastInteractionAt: syncedAt,
-            role: existing?.role || "viewer",
+            role:
+              existing?.role === "admin" ||
+              existing?.role === "staff" ||
+              existing?.role === "viewer"
+                ? existing.role
+                : "viewer",
           };
         }
       }

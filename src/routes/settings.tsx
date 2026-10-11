@@ -69,11 +69,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   createDailySummaryFlexBubble,
   createMiniAppPortalFlexBubble,
-  createPurchaseOrderFlexBubble,
   createStockAlertFlexBubble,
   DEFAULT_STORE_NAME,
   getSystemStoreName,
 } from "@/lib/flex-templates";
+import { getLatestPurchaseOrderFlexMessage } from "@/lib/flex-templates/flex-simulator-json";
 import {
   getLineFollowersHistoryFn,
   getLineServerConfigFn,
@@ -93,6 +93,7 @@ import {
   MasterStore,
   type CategoryItem,
   type LineUserFollower,
+  type ProductItem,
   type UnitItem,
   type ZoneItem,
 } from "@/lib/store";
@@ -102,6 +103,86 @@ import {
   getCategoryCodeSuggestions,
   autoFillMissingCategoryCodes,
 } from "@/lib/category-code-generator";
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isOptionalString(value: unknown): value is string | undefined {
+  return value === undefined || typeof value === "string";
+}
+
+function isUnitItem(value: unknown): value is UnitItem {
+  return (
+    isRecord(value) &&
+    typeof value["id"] === "string" &&
+    typeof value["name"] === "string" &&
+    typeof value["shortName"] === "string"
+  );
+}
+
+function isCategoryItem(value: unknown): value is CategoryItem {
+  return (
+    isRecord(value) &&
+    typeof value["id"] === "string" &&
+    typeof value["name"] === "string" &&
+    typeof value["code"] === "string"
+  );
+}
+
+function isZoneItem(value: unknown): value is ZoneItem {
+  return (
+    isRecord(value) &&
+    typeof value["id"] === "string" &&
+    typeof value["name"] === "string" &&
+    typeof value["code"] === "string" &&
+    isOptionalString(value["description"])
+  );
+}
+
+function isProductItem(value: unknown): value is ProductItem {
+  if (!isRecord(value)) return false;
+  const codeType = value["codeType"];
+  return (
+    typeof value["id"] === "string" &&
+    typeof value["sku"] === "string" &&
+    typeof value["barcode"] === "string" &&
+    (codeType === "QR" || codeType === "Barcode") &&
+    isOptionalString(value["format"]) &&
+    typeof value["name"] === "string" &&
+    isOptionalString(value["imageUrl"]) &&
+    typeof value["categoryId"] === "string" &&
+    isOptionalString(value["zoneId"]) &&
+    typeof value["unitId"] === "string" &&
+    typeof value["costPrice"] === "number" &&
+    typeof value["sellPrice"] === "number" &&
+    typeof value["stock"] === "number" &&
+    typeof value["minStock"] === "number" &&
+    typeof value["targetStock"] === "number" &&
+    typeof value["reorderQuantity"] === "number" &&
+    typeof value["isActive"] === "boolean" &&
+    typeof value["createdAt"] === "string" &&
+    typeof value["updatedAt"] === "string"
+  );
+}
+
+function isLineUserFollower(value: unknown): value is LineUserFollower {
+  if (!isRecord(value)) return false;
+  const role = value["role"];
+  return (
+    typeof value["userId"] === "string" &&
+    typeof value["displayName"] === "string" &&
+    isOptionalString(value["pictureUrl"]) &&
+    isOptionalString(value["statusMessage"]) &&
+    typeof value["followedAt"] === "string" &&
+    typeof value["lastInteractionAt"] === "string" &&
+    (role === "admin" || role === "staff" || role === "viewer")
+  );
+}
+
+function isArrayOf<T>(value: unknown, guard: (item: unknown) => item is T): value is T[] {
+  return Array.isArray(value) && value.every(guard);
+}
 
 export const Route = createFileRoute("/settings")({
   head: () => ({
@@ -204,6 +285,8 @@ function SettingsPage() {
             mergedFollowers.set(follower.userId, {
               ...savedFollower,
               ...follower,
+              pictureUrl: follower.pictureUrl ?? undefined,
+              statusMessage: follower.statusMessage ?? undefined,
               role: savedFollower?.role ?? "viewer",
             });
           });
@@ -228,28 +311,31 @@ function SettingsPage() {
         },
       });
 
-      if (res.success && res.data) {
-        if (res.data.units && Array.isArray(res.data.units) && res.data.units.length > 0) {
-          MasterStore.saveUnits(res.data.units as UnitItem[]);
-          setUnits(res.data.units as UnitItem[]);
+      if (isRecord(res) && res["success"] === true && isRecord(res["data"])) {
+        const data = res["data"];
+        const syncedUnits = data["units"];
+        const syncedCategories = data["categories"];
+        const syncedZones = data["zones"];
+        const syncedProducts = data["products"];
+        const syncedFollowers = data["followers"];
+
+        if (isArrayOf(syncedUnits, isUnitItem) && syncedUnits.length > 0) {
+          MasterStore.saveUnits(syncedUnits);
+          setUnits(syncedUnits);
         }
-        if (
-          res.data.categories &&
-          Array.isArray(res.data.categories) &&
-          res.data.categories.length > 0
-        ) {
-          MasterStore.saveCategories(res.data.categories as CategoryItem[]);
-          setCategories(res.data.categories as CategoryItem[]);
+        if (isArrayOf(syncedCategories, isCategoryItem) && syncedCategories.length > 0) {
+          MasterStore.saveCategories(syncedCategories);
+          setCategories(syncedCategories);
         }
-        if (res.data.zones && Array.isArray(res.data.zones) && res.data.zones.length > 0) {
-          MasterStore.saveZones(res.data.zones as ZoneItem[]);
-          setZones(res.data.zones as ZoneItem[]);
+        if (isArrayOf(syncedZones, isZoneItem) && syncedZones.length > 0) {
+          MasterStore.saveZones(syncedZones);
+          setZones(syncedZones);
         }
-        if (res.data.products && Array.isArray(res.data.products) && res.data.products.length > 0) {
-          MasterStore.saveProducts(res.data.products as ProductItem[]);
+        if (isArrayOf(syncedProducts, isProductItem) && syncedProducts.length > 0) {
+          MasterStore.saveProducts(syncedProducts);
         }
-        if (res.data.followers && res.data.followers.length > 0) {
-          setFollowers(res.data.followers as LineUserFollower[]);
+        if (isArrayOf(syncedFollowers, isLineUserFollower) && syncedFollowers.length > 0) {
+          setFollowers(syncedFollowers);
         }
         setSyncStatusMsg(
           lineSyncError ||
@@ -483,27 +569,13 @@ function SettingsPage() {
 
   // Flex Previews
   const handlePreviewPOFlex = () => {
-    const bubble = createPurchaseOrderFlexBubble(
-      [
-        {
-          name: "มาม่า บะหมี่กึ่งสำเร็จรูป รสต้มยำกุ้ง",
-          quantity: 30,
-          unitName: "ซอง",
-          costPrice: 6.0,
-        },
-        {
-          name: "โค้ก น้ำอัดลม ออริจินัล 325ml",
-          quantity: 48,
-          unitName: "กระป๋อง",
-          costPrice: 12.0,
-        },
-        { name: "เลย์ มันฝรั่งทอดกรอบ รสคลาสสิค", quantity: 20, unitName: "ซอง", costPrice: 17.5 },
-      ],
-      { storeName: getSystemStoreName(), note: "ใบสั่งซื้อสินค้าประจำวัน (ตัวอย่าง)" },
-    );
-    setPreviewFlexTitle("ใบสั่งซื้อสินค้า (purchase-order-flex.ts)");
-    setPreviewFlexJson(bubble);
-    setPreviewFlexModalOpen(true);
+    try {
+      setPreviewFlexTitle("ใบสั่งซื้อสินค้า (JSON ล่าสุดจาก LINE Simulator)");
+      setPreviewFlexJson(getLatestPurchaseOrderFlexMessage());
+      setPreviewFlexModalOpen(true);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : String(error));
+    }
   };
 
   const handlePreviewStockAlertFlex = () => {
@@ -560,6 +632,7 @@ function SettingsPage() {
   const [editingLiffId, setEditingLiffId] = useState<string>(
     () => clientLiffId || "2011710264-gaZ7oEcK",
   );
+  const [, setClientLiffIdState] = useState(() => clientLiffId);
 
   const handleSaveLiffId = () => {
     const trimmed = editingLiffId.trim();

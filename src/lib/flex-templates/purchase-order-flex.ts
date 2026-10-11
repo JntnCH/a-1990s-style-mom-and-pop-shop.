@@ -29,6 +29,7 @@ export interface FlexOrderItem extends ItemWithCategoryAndZone {
 export interface PurchaseOrderFlexOptions {
   storeName?: string;
   note?: string;
+  supplierName?: string;
   orderNumber?: string;
   dateStr?: string;
   timeStr?: string;

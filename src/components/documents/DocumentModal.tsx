@@ -161,7 +161,7 @@ export function DocumentModal({
       prev.map((it) => {
         if (it.id === itemId) {
           const qty = it.quantity || 1;
-          const price = prod.sellingPrice || 0;
+          const price = prod.sellPrice || 0;
           const disc = it.discountAmount || 0;
           const total = Math.max(0, qty * price - disc);
           return {
@@ -169,7 +169,7 @@ export function DocumentModal({
             productId: prod.id,
             barcode: prod.barcode,
             name: prod.name,
-            unit: prod.unitName || "ชิ้น",
+            unit: MasterStore.getUnitName(prod.unitId) || "ชิ้น",
             unitPrice: price,
             total,
           };
@@ -199,7 +199,7 @@ export function DocumentModal({
     items.map((it) => ({
       quantity: it.quantity,
       unitPrice: it.unitPrice,
-      discountAmount: it.discountAmount,
+      discountAmount: it.discountAmount ?? 0,
     })),
     vatType,
     vatRate,
@@ -509,7 +509,8 @@ export function DocumentModal({
                       </option>
                       {products.map((p) => (
                         <option key={p.id} value={p.id}>
-                          {p.name} (สต็อก: {p.currentStock} {p.unitName} | ฿{p.sellingPrice})
+                          {p.name} (สต็อก: {p.stock} {MasterStore.getUnitName(p.unitId)} | ฿
+                          {p.sellPrice})
                         </option>
                       ))}
                     </select>

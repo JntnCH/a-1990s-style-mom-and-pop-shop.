@@ -31,13 +31,15 @@ import {
   DEFAULT_STORE_NAME,
   getSystemStoreName,
 } from "@/lib/flex-templates";
+import {
+  FLEX_SIMULATOR_JSON_STORAGE_KEY,
+  parseFlexSimulatorJson,
+} from "@/lib/flex-templates/flex-simulator-json";
 import { shareFlexViaLiffPicker } from "@/lib/line-service";
 
 interface FlexSimulatorImporterProps {
   onSaved?: () => void;
 }
-
-const STORAGE_KEY = "minimark_custom_po_flex_json";
 
 export function FlexSimulatorImporter({ onSaved }: FlexSimulatorImporterProps) {
   const currentStoreName = getSystemStoreName();
@@ -78,67 +80,71 @@ export function FlexSimulatorImporter({ onSaved }: FlexSimulatorImporterProps) {
       },
     );
 
-  const defaultPOFlex = getCustomPOFlex(true, true);
-
   const [rawJson, setRawJson] = useState<string>("");
-  const [parsedFlex, setParsedFlex] = useState<unknown>(defaultPOFlex);
-  const [parseError, setParseError] = useState<string | null>(null);
+  const [parsedFlex, setParsedFlex] = useState<unknown>(null);
+  const [parseError, setParseError] = useState<string | null>(
+    "กรุณาวาง JSON จาก LINE Flex Message Simulator ในกล่องก่อน",
+  );
   const [isCustomSaved, setIsCustomSaved] = useState<boolean>(false);
   const [isTesting, setIsTesting] = useState<boolean>(false);
   const [copied, setCopied] = useState<boolean>(false);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
-      const saved = localStorage.getItem(STORAGE_KEY);
-      if (saved && saved.trim()) {
-        try {
-          const dynamicSaved = saved
-            .replace(/ร้าน MiniMark \(มินิมาร์ท โชว์ห่วย\)/g, currentStoreName)
-            .replace(/ร้าน MiniMark/g, currentStoreName)
-            .replace(/MiniMark/g, currentStoreName.replace(/^ร้าน\s*/, ""));
-          const obj = JSON.parse(dynamicSaved);
-          setRawJson(JSON.stringify(obj, null, 2));
-          setParsedFlex(obj);
-          setIsCustomSaved(true);
-        } catch {
-          setRawJson(JSON.stringify(defaultPOFlex, null, 2));
-        }
-      } else {
-        setRawJson(JSON.stringify(defaultPOFlex, null, 2));
+      const saved = localStorage.getItem(FLEX_SIMULATOR_JSON_STORAGE_KEY) || "";
+      setRawJson(saved);
+      if (!saved.trim()) {
+        setParsedFlex(null);
+        setParseError("กรุณาวาง JSON จาก LINE Flex Message Simulator ในกล่องก่อน");
+        setIsCustomSaved(false);
+        return;
+      }
+
+      try {
+        setParsedFlex(parseFlexSimulatorJson(saved));
+        setParseError(null);
+        setIsCustomSaved(true);
+      } catch (error: unknown) {
+        setParsedFlex(null);
+        setParseError(error instanceof Error ? error.message : String(error));
+        setIsCustomSaved(false);
       }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleJsonChange = (val: string) => {
     setRawJson(val);
+    try {
+      localStorage.setItem(FLEX_SIMULATOR_JSON_STORAGE_KEY, val);
+    } catch (error: unknown) {
+      setParsedFlex(null);
+      setIsCustomSaved(false);
+      setParseError(`ไม่สามารถบันทึก JSON ล่าสุดจากกล่องได้: ${String(error)}`);
+      return;
+    }
+
     if (!val.trim()) {
+      setParsedFlex(null);
+      setIsCustomSaved(false);
       setParseError("กรุณาวาง JSON จาก LINE Flex Simulator");
       return;
     }
 
     try {
-      let parsed = JSON.parse(val);
-      // Auto-wrap bubble/carousel into flex message envelope if needed
-      if (parsed.type === "bubble" || parsed.type === "carousel") {
-        parsed = {
-          type: "flex",
-          altText: `📦 ใบสั่งซื้อสินค้า — ${currentStoreName}`,
-          contents: parsed,
-        };
-      }
-      setParsedFlex(parsed);
+      setParsedFlex(parseFlexSimulatorJson(val));
       setParseError(null);
+      setIsCustomSaved(true);
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
-      setParseError(`รูปแบบ JSON ไม่ถูกต้อง: ${msg}`);
+      setParsedFlex(null);
+      setIsCustomSaved(false);
+      setParseError(err instanceof Error ? err.message : String(err));
     }
   };
 
   const handleFormatJson = () => {
     try {
       const obj = JSON.parse(rawJson);
-      setRawJson(JSON.stringify(obj, null, 2));
+      handleJsonChange(JSON.stringify(obj, null, 2));
       toast.success("จัดรูปแบบ JSON เรียบร้อย");
     } catch {
       toast.error("ไม่สามารถจัดรูปแบบได้เนื่องจาก JSON มีข้อผิดพลาด");
@@ -152,9 +158,9 @@ export function FlexSimulatorImporter({ onSaved }: FlexSimulatorImporterProps) {
     }
 
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(parsedFlex, null, 2));
+      localStorage.setItem(FLEX_SIMULATOR_JSON_STORAGE_KEY, rawJson);
       setIsCustomSaved(true);
-      toast.success("บันทึกแม่แบบ Flex Message กำหนดเองเรียบร้อยแล้ว!");
+      toast.success("ใช้ JSON ล่าสุดจากกล่อง LINE Simulator สำหรับรายการสั่งซื้อแล้ว");
       window.dispatchEvent(new CustomEvent("minimark_store_change"));
       if (onSaved) onSaved();
     } catch (e) {
@@ -164,14 +170,10 @@ export function FlexSimulatorImporter({ onSaved }: FlexSimulatorImporterProps) {
 
   const handleResetToDefault = () => {
     if (confirm("ต้องการคืนค่าเป็นแม่แบบมาตรฐานของระบบใช่หรือไม่?")) {
-      localStorage.removeItem(STORAGE_KEY);
-      setIsCustomSaved(false);
       const freshPO = getCustomPOFlex(true, true);
-      setRawJson(JSON.stringify(freshPO, null, 2));
-      setParsedFlex(freshPO);
+      handleJsonChange(JSON.stringify(freshPO, null, 2));
       setIsSeparateQtyUnit(true);
       setIsLargeFont(true);
-      setParseError(null);
       toast.success("คืนค่าแม่แบบมาตรฐาน (แยกจำนวน/หน่วยนับ - ตัวหนังสือใหญ่) เรียบร้อยแล้ว");
       window.dispatchEvent(new CustomEvent("minimark_store_change"));
       if (onSaved) onSaved();
@@ -191,9 +193,7 @@ export function FlexSimulatorImporter({ onSaved }: FlexSimulatorImporterProps) {
     setIsSeparateQtyUnit(newSeparate);
     setIsLargeFont(newLarge);
     const newPO = getCustomPOFlex(newSeparate, newLarge);
-    setRawJson(JSON.stringify(newPO, null, 2));
-    setParsedFlex(newPO);
-    setParseError(null);
+    handleJsonChange(JSON.stringify(newPO, null, 2));
     toast.success(
       `ปรับเลย์เอาต์เป็น: ${newSeparate ? "แยกคอลัมน์ จำนวน/หน่วยนับ (3 คอลัมน์)" : "รวมจำนวน+หน่วยนับ (2 คอลัมน์)"} + ${newLarge ? "ตัวอักษรขนาดใหญ่" : "ตัวอักษรขนาดปกติ"} เรียบร้อย`,
     );
@@ -259,9 +259,7 @@ export function FlexSimulatorImporter({ onSaved }: FlexSimulatorImporterProps) {
     }
 
     if (presetObj) {
-      setRawJson(JSON.stringify(presetObj, null, 2));
-      setParsedFlex(presetObj);
-      setParseError(null);
+      handleJsonChange(JSON.stringify(presetObj, null, 2));
       toast.success(`โหลดตัวอย่างแม่แบบ "${presetName}" เรียบร้อย`);
     }
   };
@@ -348,10 +346,11 @@ export function FlexSimulatorImporter({ onSaved }: FlexSimulatorImporterProps) {
         <Alert className="bg-emerald-500/10 border-emerald-500/30 text-emerald-950 dark:text-emerald-200 rounded-2xl">
           <CheckCircle2 className="size-4 text-emerald-600" />
           <AlertTitle className="text-xs font-semibold">
-            กำลังใช้งานแม่แบบกำหนดเอง (Custom Active Template)
+            ใช้ JSON ล่าสุดจากกล่อง LINE Simulator แล้ว
           </AlertTitle>
           <AlertDescription className="text-xs">
-            เมื่อกดส่งสั่งซื้อใน LINE ระบบจะใช้โครงสร้าง JSON ที่คุณออกแบบและบันทึกไว้นี้ในการส่ง
+            ใช้ JSON นี้เป็นโครงสร้างและสไตล์ของ Flex Message
+            ส่วนรายการ/จำนวน/ยอดเงินอ่านจากใบสั่งซื้อจริง ณ ตอน preview หรือส่งออก
           </AlertDescription>
         </Alert>
       ) : null}
@@ -451,10 +450,21 @@ export function FlexSimulatorImporter({ onSaved }: FlexSimulatorImporterProps) {
             เพื่อดูหรือปรับแต่งเพิ่มเติม
           </li>
           <li>
-            เมื่อปรับแต่งเสร็จ คัดลอก JSON จาก Simulator กลับมาวางในกล่องด้านซ้ายนี้แล้วกด{" "}
-            <strong>&quot;บันทึกเป็นแม่แบบใช้งาน&quot;</strong>
+            เมื่อปรับแต่งเสร็จ คัดลอก JSON จาก Simulator กลับมาวางในกล่องนี้ ระบบจะบันทึก JSON
+            ล่าสุดและใช้กับรายการสั่งซื้อทันที
           </li>
         </ol>
+        <p className="text-[11px] leading-relaxed text-amber-900/90 dark:text-amber-200/90">
+          ข้อมูลสินค้าและยอดเงินจริงจะถูกเติมตอน preview/ส่งออก Flex โดยคงโครงสร้างเดิมไว้
+          หากต้องการกำหนดตำแหน่งเอง ให้ใส่ token ในค่า text ของ JSON เช่น{" "}
+          <code>{"{{productName}}"}</code>, <code>{"{{quantity}}"}</code>,{" "}
+          <code>{"{{unitName}}"}</code> ในกล่องแถวสินค้า (ระบบทำซ้ำแถวนั้นตามรายการจริง) และใช้{" "}
+          <code>{"{{categoryName}}"}</code> กับ <code>{"{{itemCount}}"}</code>{" "}
+          ในแถวหัวหมวดหมู่เพื่อสร้างหัวกลุ่มจริง และใช้ <code>{"{{orderNumber}}"}</code>,{" "}
+          <code>{"{{supplierName}}"}</code>, <code>{"{{totalQuantity}}"}</code>,{" "}
+          <code>{"{{totalCost}}"}</code> สำหรับข้อมูลใบสั่งซื้อ
+          ระบบยังเติมแถวสินค้าตัวอย่างมาตรฐานที่ตรวจพบได้อัตโนมัติด้วย
+        </p>
       </div>
 
       {/* Editor & Live Preview Grid */}

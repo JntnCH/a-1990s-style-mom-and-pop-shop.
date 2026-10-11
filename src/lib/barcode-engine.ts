@@ -26,7 +26,7 @@ export function calculateEAN13CheckDigit(digits12: string): number {
   let sum = 0;
 
   for (let i = 0; i < 12; i++) {
-    const digit = parseInt(base12[i], 10);
+    const digit = parseInt(base12.charAt(i), 10);
     // 0-indexed: index 0 is 1st (odd position, weight 1), index 1 is 2nd (even position, weight 3)
     sum += i % 2 === 0 ? digit * 1 : digit * 3;
   }
@@ -46,7 +46,7 @@ export function validateEAN13(barcode: string): { valid: boolean; reason?: strin
 
   try {
     const expectedCheck = calculateEAN13CheckDigit(clean.substring(0, 12));
-    const actualCheck = parseInt(clean[12], 10);
+    const actualCheck = parseInt(clean.charAt(12), 10);
     if (expectedCheck !== actualCheck) {
       return {
         valid: false,

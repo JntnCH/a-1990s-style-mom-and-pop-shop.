@@ -43,7 +43,7 @@ export function thaiBahtText(amount: number): string {
             result += "หนึ่ง";
           }
         } else {
-          result += THAI_DIGITS[digit] + THAI_POSITIONS[pos];
+          result += (THAI_DIGITS[digit] ?? "") + (THAI_POSITIONS[pos] ?? "");
         }
       }
     }

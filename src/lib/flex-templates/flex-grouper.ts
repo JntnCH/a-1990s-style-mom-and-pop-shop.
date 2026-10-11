@@ -14,7 +14,6 @@ export interface ItemWithCategoryAndZone {
   categoryName?: string | undefined;
   zoneId?: string | undefined;
   zoneName?: string | undefined;
-  [key: string]: unknown;
 }
 
 export interface GroupedFlexItems<T extends ItemWithCategoryAndZone> {

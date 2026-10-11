@@ -226,7 +226,10 @@ export function ProductImageUploader({
                 size="sm"
                 className="h-10 px-4 text-xs font-bold rounded-xl gap-2 bg-primary text-primary-foreground shadow-xs active:scale-98"
                 onClick={() => {
-                  if (typeof navigator !== "undefined" && navigator.mediaDevices?.getUserMedia) {
+                  if (
+                    typeof navigator !== "undefined" &&
+                    typeof navigator.mediaDevices?.getUserMedia === "function"
+                  ) {
                     void startLiveCamera();
                   } else {
                     cameraInputRef.current?.click();
@@ -255,7 +258,10 @@ export function ProductImageUploader({
             type="button"
             className="w-full h-14 sm:h-15 rounded-2xl bg-primary hover:bg-primary/90 text-primary-foreground font-bold text-sm sm:text-base flex items-center justify-center gap-3 shadow-sm transition-transform active:scale-98"
             onClick={() => {
-              if (typeof navigator !== "undefined" && navigator.mediaDevices?.getUserMedia) {
+              if (
+                typeof navigator !== "undefined" &&
+                typeof navigator.mediaDevices?.getUserMedia === "function"
+              ) {
                 void startLiveCamera();
               } else {
                 cameraInputRef.current?.click();

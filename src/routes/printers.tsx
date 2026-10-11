@@ -183,7 +183,7 @@ function PrintersPage() {
       model: formModel.trim() || formName.trim(),
       type: formType,
       connection: formConnection,
-      ipAddress: formIpAddress.trim() || undefined,
+      ...(formIpAddress.trim() ? { ipAddress: formIpAddress.trim() } : {}),
       port: formPort || 9100,
       isDefaultReceipt: editingPrinterId ? false : printers.length === 0,
       isDefaultOrder: false,
