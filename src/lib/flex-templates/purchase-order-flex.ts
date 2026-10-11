@@ -288,31 +288,6 @@ export function createPurchaseOrderFlexBubble(
                     wrap: true,
                   },
                 ],
-              }
-            : {
-                type: "box" as const,
-                layout: "horizontal" as const,
-                contents: [
-                  {
-                    type: "text" as const,
-                    text: "รายการสินค้าที่จะสั่งซื้อ",
-                    size: isLargeFont ? ("sm" as const) : ("xs" as const),
-                    color: "#6b7280",
-                    weight: "bold" as const,
-                    flex: 6,
-                    wrap: true,
-                  },
-                  {
-                    type: "text" as const,
-                    text: "จำนวน / หน่วยนับ",
-                    size: isLargeFont ? ("sm" as const) : ("xs" as const),
-                    color: "#6b7280",
-                    weight: "bold" as const,
-                    align: "end" as const,
-                    flex: 4,
-                    wrap: true,
-                  },
-                ],
               },
           {
             type: "separator" as const,
@@ -347,7 +322,7 @@ export function createPurchaseOrderFlexBubble(
             contents: [
               {
                 type: "text" as const,
-                text: "รวมจำนวนสินค้าทั้งหมด",
+                text: "จำนวนสินค้าทั้งหมด",
                 size: isLargeFont ? ("md" as const) : ("sm" as const),
                 color: "#374151",
                 flex: 5,
@@ -372,7 +347,7 @@ export function createPurchaseOrderFlexBubble(
             contents: [
               {
                 type: "text" as const,
-                text: "ประมาณการยอดเงินสั่งซื้อ",
+                text: "ประมาณการยอดสั่งซื้อ",
                 size: isLargeFont ? ("md" as const) : ("sm" as const),
                 color: "#374151",
                 flex: 5,
